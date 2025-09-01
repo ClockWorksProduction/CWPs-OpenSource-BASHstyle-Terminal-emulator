@@ -20,10 +20,10 @@
     "javascript",
     "web-terminal"
   ],
-  "author": "",
+  "author": "ClockWorksProduction Studio",
   "license": "GNU GENERAL PUBLIC LICENSE",
   "bugs": {
     "url": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator"
   },
-  "homepage": "https://github.com/USERNAME/CWP_OpenTerminalEmmulator_CORE#readme"
+  "homepage": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/blob/main/README.md"
 }
