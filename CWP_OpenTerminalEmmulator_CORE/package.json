@@ -27,7 +27,6 @@
   },
   "homepage": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator#readme",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
     "access": "public"
   }
 }
