@@ -21,6 +21,11 @@ You can install the library using NPM:
 npm install cwp-open-terminal-emulator
 ```
 
+or clone this repository
+```git
+gh repo clone ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator
+```
+
 ## Quick Start
 
 1.  **Create an HTML file** with a container for the terminal and the necessary input/output elements.
