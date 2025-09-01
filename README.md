@@ -44,7 +44,7 @@ If you prefer to use GitHub Packages, you will need to authenticate to the GitHu
     Create a `.npmrc` file in your project's root directory and add the following line:
 
     ```
-    @clockworksproduction:registry=https://npm.pkg.github.com/
+    @ClockWorksProduction:registry=https://npm.pkg.github.com/
     ```
 
 3.  **Install the package.**
