@@ -1,5 +1,5 @@
 {
-  "name": "cwp-open-terminal-emulator",
+  "name": "@ClockWorksProduction/cwp-open-terminal-emulator",
   "version": "4.0.0",
   "description": "A modular, BASH-style terminal emulator library for the web.",
   "main": "dist/terminal.js",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/CWP_OpenTerminalEmmulator_CORE.git"
+    "url": "git+https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator.git"
   },
   "keywords": [
     "terminal",
@@ -21,9 +21,12 @@
     "web-terminal"
   ],
   "author": "ClockWorksProduction Studio",
-  "license": "GNU GENERAL PUBLIC LICENSE",
+  "license": "GPL-3.0-or-later",
   "bugs": {
-    "url": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator"
+    "url": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/issues"
   },
-  "homepage": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/blob/main/README.md"
+  "homepage": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
