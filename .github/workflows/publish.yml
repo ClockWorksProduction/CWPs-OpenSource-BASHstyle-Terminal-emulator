@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-          scope: '@clockworksproduction'
+          scope: '@clockworksproduction-studio'
 
       - name: Publish to NPM
         run: npm publish
