@@ -2,18 +2,65 @@ import { Command } from './command.js';
 import { VFile, VDirectory } from './filesystem.js';
 import { AddonExecutor } from './addon.js';
 import { VOS } from './vos.js';
+import { BootCheckRegistry } from './boot-checks.js';
 
 export class CentralTerminal {
     constructor(containerId) {
-        const container = document.querySelector(containerId);
-        if (!container) {
+        this.container = document.querySelector(containerId);
+        if (!this.container) {
             console.error(`Container with id ${containerId} not found.`);
             return;
         }
 
-        this.container = container;
-        this.output = container.querySelector('#terminalOutput');
-        this.input = container.querySelector('#terminal-command-input');
+        this.biosScreen = document.getElementById('bios-screen');
+        this.biosOutput = document.getElementById('bios-output');
+        this.pseudoTerminal = document.getElementById('pseudo-terminal');
+        this.bootCheckRegistry = new BootCheckRegistry();
+    }
+
+    async boot() {
+        this.biosOutput.innerHTML = '';
+        this.biosOutput.innerHTML += `<p>Central BIOS v1.0.0</p>`;
+        this.biosOutput.innerHTML += `<p>Copyright (C) 2024, Central Corp.</p>`;
+        this.biosOutput.innerHTML += `<p>&nbsp;</p>`;
+
+        const allOk = await this.bootCheckRegistry.runChecks(this);
+
+        this.biosOutput.innerHTML += `<p>&nbsp;</p>`;
+
+        if (allOk) {
+            this.biosOutput.innerHTML += `<p>Booting complete.</p>`;
+            setTimeout(() => {
+                this.biosScreen.style.display = 'none';
+                this.pseudoTerminal.style.display = 'flex';
+                this.init();
+            }, 1000);
+        } else {
+            this.biosOutput.innerHTML += `<p class="status-failed">Boot failed. Please check the system.</p>`;
+        }
+    }
+
+    addBootCheck(bootCheck) {
+        this.bootCheckRegistry.addCheck(bootCheck);
+    }
+
+    bootCheck(check) {
+        return new Promise(resolve => {
+            check().then(success => {
+                if (success) {
+                    resolve({ status: 'ok', message: 'OK' });
+                } else {
+                    resolve({ status: 'failed', message: 'FAILED' });
+                }
+            }).catch(() => {
+                resolve({ status: 'failed', message: 'FAILED' });
+            });
+        });
+    }
+
+    init() {
+        this.output = this.container.querySelector('#terminalOutput');
+        this.input = this.container.querySelector('#terminal-command-input');
 
         this.vOS = new VOS();
         this.addonExecutor = new AddonExecutor();
@@ -27,6 +74,9 @@ export class CentralTerminal {
                 this.input.value = '';
             }
         });
+
+        this.print("Welcome to Central Terminal!");
+        this.print("Type 'help' to see a list of available commands.");
     }
 
     print(text) {
@@ -102,7 +152,7 @@ export class CentralTerminal {
         this.addCommand(new Command("clear", "Clear terminal output", () => this.clear()));
         this.addCommand(new Command("help", "List available commands", () => {
             const helpText = [...new Set(Object.values(this.commands))].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(15)}- ${c.description}`).join('\n');
-            this.print(helpText);
+            this.printHtml(`<pre>${helpText}</pre>`);
         }));
         this.addCommand(new Command("run", "Run a registered addon", (args) => {
             if (!args[0]) { this.print("Usage: run <addon-name>"); return; }
@@ -146,10 +196,10 @@ export class CentralTerminal {
         }
 
         const parts = input.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-        const cmdName = parts.shift()?.replace(/"/g, '').toLowerCase();
+        const cmdName = parts.shift()?.replace(/\"/g, '').toLowerCase();
         if (!cmdName) return;
 
-        const args = parts.map(arg => arg.replace(/"/g, ''));
+        const args = parts.map(arg => arg.replace(/\"/g, ''));
         const command = this.commands[cmdName];
 
         if (command) {

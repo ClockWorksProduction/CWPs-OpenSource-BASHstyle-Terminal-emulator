@@ -59,3 +59,15 @@ body, html {
     margin: 0;
     padding: 0;
 }
+
+.status-ok {
+    color: #2ecc71;
+}
+
+.status-failed {
+    color: #e74c3c;
+}
+
+.status-warning {
+    color: #f1c40f;
+}
