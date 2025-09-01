@@ -1,6 +1,7 @@
 import { CentralTerminal } from '../dist/terminal.js';
 import { BootCheck } from '../dist/boot-checks.js';
 import { Command } from '../dist/command.js';
+import { ImageAddon } from './image-addon.js';
 
 const terminal = new CentralTerminal('#pseudo-terminal');
 
@@ -26,5 +27,8 @@ const cowsay = new Command('cowsay', 'Displays a cow with a message.', (args) =>
     terminal.printHtml(`${message}${cow}`);
 });
 terminal.addCommand(cowsay);
+
+// Register addons
+terminal.registerAddon(new ImageAddon());
 
 terminal.boot();
