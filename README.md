@@ -1,8 +1,8 @@
 # CWP Open Terminal Emulator
 
-[![NPM version](https://img.shields.io/npm/v/@clockworksproduction/cwp-open-terminal-emulator.svg)](https://www.npmjs.com/package/@clockworksproduction/cwp-open-terminal-emulator)
+[![GitHub package version](https://img.shields.io/github/package-json/v/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator?filename=CWP_OpenTerminalEmmulator_CORE/package.json)](https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/pkgs/npm/cwp-open-terminal-emulator)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Publish to NPM and GitHub Packages](https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/actions/workflows/publish.yml/badge.svg)](https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/actions/workflows/publish.yml)
+
 
 A modular, BASH-style terminal emulator library for the web. CWP Open Terminal Emulator is a lightweight, extensible, and easy-to-integrate solution for adding a terminal interface to your web applications.
 
