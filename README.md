@@ -1,18 +1,17 @@
 # CWP Open Terminal Emulator
 
 [![GitHub package version](https://img.shields.io/github/package-json/v/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator?filename=CWP_OpenTerminalEmmulator_CORE/package.json)](https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/pkgs/npm/cwp-open-terminal-emulator)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 
 A modular, BASH-style terminal emulator library for the web. CWP Open Terminal Emulator is a lightweight, extensible, and easy-to-integrate solution for adding a terminal interface to your web applications.
 
 ## Features
 
--   **BASH-like Environment:** Familiar commands like `ls`, `cd`, `cat`, `mkdir`, `pwd`, `rm`, `echo`, and `history`.
--   **Virtual File System:** An in-memory file system to simulate file and directory operations.
--   **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
--   **Easy Integration:** Import and initialize the terminal with just a few lines of code.
--   **Dual Registry Support:** Install from either the public NPM registry or GitHub Packages.
+- **BASH-like Environment:** Familiar commands like `ls`, `cd`, `cat`, `mkdir`, `pwd`, `rm`, `echo`, and `history`.
+- **Virtual File System:** An in-memory file system to simulate file and directory operations.
+- **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
+- **Easy Integration:** Import and initialize the terminal with just a few lines of code.
+- **Dual Registry Support:** Install from either the public NPM registry or GitHub Packages.
 
 ## Installation
 
@@ -64,26 +63,31 @@ Once installed, you can import and use the terminal in your project.
 import { CentralTerminal, Addon, Command } from '@clockworksproduction/cwp-open-terminal-emulator';
 
 // 1. Initialize the Terminal
-const term = new CentralTerminal('#central-terminal-container');
+const term = new CentralTerminal('#central-terminal-container', {
+    prompt: '[user@localhost ~]$ '
+});
 
-// 2. (Optional) Create a custom addon
-class GreeterAddon extends Addon {
+// 2. (Optional) Create a custom login message
+class LoginAddon extends Addon {
     constructor() {
-        super('greet');
+        super('login');
     }
 
-    onStart(term, vOS, name) {
-        this.term.print(`Hello, ${name || 'World'}!`);
-        this.term.print("This is a custom addon. Type 'exit' to return to the main terminal.");
+    onStart(term) {
+        const lastLogin = new Date(Date.now() - 86400000).toString(); // 24 hours ago
+        term.print(`Last login: ${lastLogin} on ttys001`);
+        term.print("Welcome to your new terminal!");
+        term.print("Type 'help' to get started.");
     }
 }
 
-// 3. (Optional) Register the addon
-term.registerAddon(new GreeterAddon());
+// 3. (Optional) Register and run the login addon
+term.registerAddon(new LoginAddon());
+term.addonExecutor.startAddon('login', term, term.vOS);
 
-// 4. (Optional) Add a new command to the main terminal
-term.addCommand(new Command('hello', 'Says hello.', (args) => {
-    term.print(`Hello, ${args[0] || 'stranger'}!`);
+// 4. (Optional) Add a new command
+term.addCommand(new Command('whoami', 'Prints the current user', () => {
+    term.print('user');
 }));
 
 // 5. Boot the terminal
@@ -92,4 +96,14 @@ term.boot();
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 or later. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Lesser General Public License v3.0 or later (LGPLv3+).
+
+✅ You can use this library freely in personal, open-source, or commercial projects.
+
+✅ You may distribute applications that link to this library under any license you choose.
+
+⚠️ If you modify this library itself and distribute your changes, you must publish them under the LGPLv3 as well.
+
+This ensures the core library remains open source, while still allowing broad use and integration in proprietary or open projects.
+
+See the [LICENSE](LICENSE) file for the full license text.
