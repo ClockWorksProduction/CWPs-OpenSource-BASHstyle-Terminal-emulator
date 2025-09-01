@@ -40,3 +40,22 @@ body, html {
     font-family: inherit;
     outline: none;
 }
+
+#bios-screen {
+    background-color: #000;
+    color: #fff;
+    font-family: 'Courier New', Courier, monospace;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 100;
+}
+
+#bios-output p {
+    margin: 0;
+    padding: 0;
+}
