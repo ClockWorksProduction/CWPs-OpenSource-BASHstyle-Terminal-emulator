@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-          scope: '@ClockWorksProduction'
+          scope: '@clockworksproduction'
 
       - name: Publish to NPM
         run: npm publish
@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com/'
-          scope: '@ClockWorksProduction'
+          scope: '@clockworksproduction'
 
       - name: Publish to GitHub Packages
         run: npm publish

@@ -1,5 +1,5 @@
 {
-  "name": "@ClockWorksProduction/cwp-open-terminal-emulator",
+  "name": "@clockworksproduction/cwp-open-terminal-emulator",
   "version": "4.0.0",
   "description": "A modular, BASH-style terminal emulator library for the web.",
   "main": "dist/terminal.js",
