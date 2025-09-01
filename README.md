@@ -94,6 +94,11 @@ term.addCommand(new Command('whoami', 'Prints the current user', () => {
 term.boot();
 ```
 
+## Documentation
+
+- [Addon System](docs/addons.md)
+- [Troubleshooting and FAQ](docs/troubleshooting.md)
+
 ## License
 
 This project is licensed under the GNU Lesser General Public License v3.0 or later (LGPLv3+).
