@@ -12,9 +12,27 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 - **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
 - **Easy Integration:** Import and initialize the terminal with just a few lines of code.
 
+## Getting Started
+
+We offer two convenient ways to get your terminal up and running:
+
+### 1. Automated Setup (Recommended)
+
+For the fastest setup, run our interactive tool. It will ask you a few questions and automatically generate the necessary files for you.
+
+After installing the package, run the following command in your project's root directory:
+
+```bash
+npx cwp-terminal-setup
+```
+
+### 2. Manual Setup
+
+If you prefer to set things up yourself, our **[Manual Setup Guide (SETUP.md)](SETUP.md)** provides a complete walkthrough from installation to a fully functional terminal.
+
 ## Installation
 
-This is the easiest and most common way to install the package.
+If you use the manual setup, you'll need to install the package first.
 
 ```bash
 npm install @clockworksproduction-studio/cwp-open-terminal-emulator
@@ -24,45 +42,6 @@ or
 
 ```bash
 npm i @clockworksproduction-studio/cwp-open-terminal-emulator
-```
-
-## Quick Start
-
-Once installed, you can import and use the terminal in your project.
-
-```javascript
-import { CentralTerminal, Addon, Command } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
-
-// 1. Initialize the Terminal
-const term = new CentralTerminal('#central-terminal-container', {
-    prompt: '[user@localhost ~]$ '
-});
-
-// 2. (Optional) Create a custom login message
-class LoginAddon extends Addon {
-    constructor() {
-        super('login');
-    }
-
-    onStart(term) {
-        const lastLogin = new Date(Date.now() - 86400000).toString(); // 24 hours ago
-        term.print(`Last login: ${lastLogin} on ttys001`);
-        term.print("Welcome to your new terminal!");
-        term.print("Type 'help' to get started.");
-    }
-}
-
-// 3. (Optional) Register and run the login addon
-term.registerAddon(new LoginAddon());
-term.addonExecutor.startAddon('login', term, term.vOS);
-
-// 4. (Optional) Add a new command
-term.addCommand(new Command('whoami', 'Prints the current user', () => {
-    term.print('user');
-}));
-
-// 5. Boot the terminal
-term.boot();
 ```
 
 ## Documentation
