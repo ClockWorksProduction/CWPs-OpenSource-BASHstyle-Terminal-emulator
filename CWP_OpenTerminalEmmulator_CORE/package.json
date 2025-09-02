@@ -4,6 +4,13 @@
   "description": "A modular, BASH-style terminal emulator library for the web.",
   "main": "dist/terminal.js",
   "module": "dist/terminal.js",
+  "files": [
+    "dist",
+    "/LICENSE",
+    "/README.md",
+    "/CONTRIBUTING.md",
+    "/CODE_OF_CONDUCT.md"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
