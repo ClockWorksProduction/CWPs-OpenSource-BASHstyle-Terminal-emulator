@@ -1,4 +1,4 @@
-import { CentralTerminal, Addon, Command } from '../dist/terminal.js';
+import { CentralTerminal, Addon, Command } from '../CWP_OpenTerminalEmmulator_CORE/dist/terminal.js';
 
 // 1. Initialize the Terminal
 const term = new CentralTerminal('#central-terminal-container');
