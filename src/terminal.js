@@ -203,6 +203,31 @@ class BootCheckRegistry {
     }
 }
 
+/**
+ * Represents a single boot-time check for the terminal.
+ * @property {string} name - The name of the check (e.g., "Memory Check").
+ * @property {function(): Promise<boolean>} check - A function that returns a promise resolving to `true` (success) or `false` (failure).
+ * @property {string} description - A brief description of what the check does.
+ */
+export class BootCheck {
+    /**
+     * @param {string} name - The name of the check.
+     * @param {function(): Promise<boolean>} check - The check function.
+     * @param {string} description - A description of the check.
+     */
+    constructor(name, check, description) {
+        if (typeof name !== 'string' || name.trim() === '') {
+            throw new Error('BootCheck name must be a non-empty string.');
+        }
+        if (typeof check !== 'function') {
+            throw new Error('BootCheck check must be a function that returns a Promise.');
+        }
+        this.name = name;
+        this.check = check;
+        this.description = description || '';
+    }
+}
+
 // --- Main Terminal Class ---
 export class CentralTerminal {
     constructor(containerId) {
