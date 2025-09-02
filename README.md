@@ -22,7 +22,7 @@ You can install the library from either the standard NPM registry or from GitHub
 This is the easiest and most common way to install the package.
 
 ```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator
+npm install @clockworksproduction/cwp-open-terminal-emulator
 ```
 
 ### Option 2: Install from GitHub Packages
@@ -44,7 +44,7 @@ If you prefer to use GitHub Packages, you will need to authenticate to the GitHu
     Create a `.npmrc` file in your project's root directory and add the following line:
 
     ```
-    @clockworksproduction-studio:registry=https://npm.pkg.github.com/
+    @clockworksproduction:registry=https://npm.pkg.github.com/
     ```
 
 3.  **Install the package.**
@@ -52,7 +52,7 @@ If you prefer to use GitHub Packages, you will need to authenticate to the GitHu
     Now you can install the package as usual:
 
     ```bash
-    npm install @clockworksproduction-studio/cwp-open-terminal-emulator
+    npm install @clockworksproduction/cwp-open-terminal-emulator
     ```
 
 ## Quick Start
@@ -60,7 +60,7 @@ If you prefer to use GitHub Packages, you will need to authenticate to the GitHu
 Once installed, you can import and use the terminal in your project.
 
 ```javascript
-import { CentralTerminal, Addon, Command } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
+import { CentralTerminal, Addon, Command } from '@clockworksproduction/cwp-open-terminal-emulator';
 
 // 1. Initialize the Terminal
 const term = new CentralTerminal('#central-terminal-container', {
