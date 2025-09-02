@@ -1,6 +1,6 @@
 {
   "name": "@clockworksproduction-studio/cwp-open-terminal-emulator",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "description": "A modular, BASH-style terminal emulator library for the web.",
   "main": "src/terminal.js",
   "module": "src/terminal.js",
