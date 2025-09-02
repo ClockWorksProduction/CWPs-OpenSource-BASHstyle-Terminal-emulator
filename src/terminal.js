@@ -1,7 +1,7 @@
 
 // ==========================
 // CWP_OpenTerminalEmmulator_CORE.js
-// v4.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
+// v4.1.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
 // ==========================
 
 // --- VFile and VDirectory Classes ---
@@ -46,6 +46,7 @@ class AddonExecutor {
         if (this.activeAddon) { term.print("An addon is already running. Please 'exit' first."); return; }
         const addon = this.addons[name.toLowerCase()];
         if (addon) {
+            term.printHtml(`<p style="color: yellow;">This addon runs in your browser. Only install trusted addons from official sources. Use at your own risk.</p>`);
             this.activeAddon = addon;
             addon.onStart(term, vOS, ...args);
         } else {
@@ -259,8 +260,33 @@ export class CentralTerminal {
         });
     }
 
+    _sanitizeHtml(html) {
+        const allowedTags = ['p', 'b', 'i', 'u', 'em', 'strong', 'pre', 'code', 'span', 'div', 'img', 'audio'];
+        const allowedAttrs = ['style', 'src', 'alt', 'controls'];
+
+        const el = document.createElement('div');
+        el.innerHTML = html;
+
+        el.querySelectorAll('*').forEach(node => {
+            // Remove disallowed tags
+            if (!allowedTags.includes(node.tagName.toLowerCase())) {
+                node.parentNode.removeChild(node);
+                return;
+            }
+
+            // Remove disallowed attributes
+            for (const attr of [...node.attributes]) {
+                if (!allowedAttrs.includes(attr.name.toLowerCase())) {
+                    node.removeAttribute(attr.name);
+                }
+            }
+        });
+
+        return el.innerHTML;
+    }
+
     print(text) { const p = document.createElement('p'); p.textContent = text; this.output.appendChild(p); this.output.scrollTop = this.output.scrollHeight; }
-    printHtml(html) { const div = document.createElement('div'); div.innerHTML = html; this.output.appendChild(div); this.output.scrollTop = this.output.scrollHeight; }
+    printHtml(html) { const div = document.createElement('div'); div.innerHTML = this._sanitizeHtml(html); this.output.appendChild(div); this.output.scrollTop = this.output.scrollHeight; }
     clear() { this.output.innerHTML = ''; }
 
     _registerDefaultCommands() {
