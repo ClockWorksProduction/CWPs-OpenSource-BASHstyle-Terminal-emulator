@@ -7,7 +7,7 @@ The CWP Open Terminal Emulator features a powerful addon system that allows you 
 To create an addon, you need to create a new class that extends the `Addon` base class.
 
 ```javascript
-import { Addon } from '@clockworksproduction/cwp-open-terminal-emulator';
+import { Addon } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
 
 class MyAddon extends Addon {
     constructor() {
@@ -40,7 +40,7 @@ class MyAddon extends Addon {
 Once you have created your addon, you need to register it with the terminal instance.
 
 ```javascript
-import { CentralTerminal } from '@clockworksproduction/cwp-open-terminal-emulator';
+import { CentralTerminal } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
 import MyAddon from './my-addon.js';
 
 const term = new CentralTerminal('#terminal-container');
