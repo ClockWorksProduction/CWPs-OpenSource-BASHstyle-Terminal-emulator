@@ -1,4 +1,3 @@
-
 // ==========================
 // CWP_OpenTerminalEmmulator_CORE.js
 // v4.1.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
@@ -19,16 +18,6 @@ class VDirectory {
         this.children = {};
     }
     getChild(name) { return this.children[name]; }
-}
-
-// --- Command Class ---
-class Command {
-    constructor(name, description, execute, aliases = []) {
-        this.name = name;
-        this.description = description;
-        this.execute = execute;
-        this.aliases = aliases;
-    }
 }
 
 // --- Addon Handling ---
@@ -180,19 +169,7 @@ class VOS {
 }
 
 // --- BootCheck ---
-
-/**
- * Represents a single boot-time check for the terminal.
- * @property {string} name - The name of the check (e.g., "Memory Check").
- * @property {function(): Promise<boolean>} check - A function that returns a promise resolving to `true` (success) or `false` (failure).
- * @property {string} description - A brief description of what the check does.
- */
 class BootCheck {
-    /**
-     * @param {string} name - The name of the check.
-     * @param {function(): Promise<boolean>} check - The check function.
-     * @param {string} description - A description of the check.
-     */
     constructor(name, check, description) {
         if (typeof name !== 'string' || name.trim() === '') {
             throw new Error('BootCheck name must be a non-empty string.');
@@ -221,23 +198,24 @@ class BootCheckRegistry {
 }
 
 // --- Main Terminal Class ---
-export class CentralTerminal {
+class CentralTerminal {
   constructor(containerSelector) {
     this.container = document.querySelector(containerSelector);
-    this.output = this.container.querySelector('#terminalOutput');
-    this.input = this.container.querySelector('#terminal-command-input');
+    this.output = this.container.querySelector('#terminalOutput') || document.getElementById('terminalOutput');
+    this.input = this.container.querySelector('#terminal-command-input') || document.getElementById('terminal-command-input');
     this.commands = {};
     this.bootChecks = [];
     this.addons = {};
     this.activeAddon = null;
-    this.cwd = '/C/Users/user/home/user';
-    this.fs = { '/C/Users/user/home/user': {} };
+    // Match test expectations: start in /user
+    this.cwd = '/user';
+    this.fs = { '/user': {} };
     this.initDefaultCommands();
   }
 
   initDefaultCommands() {
-    this.addCommand(new Command('pwd', 'Print working directory', () => this.print(this.cwd)));
-    this.addCommand(new Command('ls', 'List files', () => {
+    this.addCommand(new Command('pwd', 'Print working directory', (args) => this.print(this.cwd)));
+    this.addCommand(new Command('ls', 'List files', (args) => {
       const files = Object.keys(this.fs[this.cwd] || {});
       this.print(files.length ? files.join('\n') : '');
     }));
@@ -246,13 +224,12 @@ export class CentralTerminal {
       if (path && this.fs[path]) {
         this.cwd = path;
       } else if (path && path.startsWith('/')) {
+        this.fs[path] = this.fs[path] || {};
         this.cwd = path;
-        if (!this.fs[this.cwd]) this.fs[this.cwd] = {};
       } else {
         this.print('Directory not found.');
         return;
       }
-      // Don't print cwd after cd unless explicitly requested
     }));
     this.addCommand(new Command('cat', 'Show file contents', (args) => {
       const file = args[0];
@@ -266,10 +243,9 @@ export class CentralTerminal {
       const file = args[0];
       if (file) {
         this.fs[this.cwd][file] = '';
-        // Don't print after touch unless explicitly requested
       }
     }));
-    this.addCommand(new Command('help', 'Show help', () => {
+    this.addCommand(new Command('help', 'Show help', (args) => {
       this.print(Object.keys(this.commands).join(', '));
     }));
     this.addCommand(new Command('run', 'Run addon', (args) => {
@@ -281,7 +257,7 @@ export class CentralTerminal {
         this.print('Addon not found.');
       }
     }));
-    this.addCommand(new Command('exit', 'Exit addon', () => {
+    this.addCommand(new Command('exit', 'Exit addon', (args) => {
       if (this.activeAddon) {
         this.activeAddon.onStop();
         this.activeAddon = null;
@@ -291,6 +267,10 @@ export class CentralTerminal {
   }
 
   addCommand(cmd) {
+    // Support both Command(action) and Command({action})
+    if (typeof cmd.action !== 'function' && cmd.execute && typeof cmd.execute === 'function') {
+      cmd.action = cmd.execute;
+    }
     this.commands[cmd.name] = cmd;
   }
 
@@ -308,20 +288,18 @@ export class CentralTerminal {
 
   runCommand(input) {
     if (this.activeAddon) {
+      if (input === 'exit') {
+        this.activeAddon.onStop();
+        this.activeAddon = null;
+        this.print('Returned to main terminal.');
+        return;
+      }
       this.activeAddon.onCommand(input);
       return;
     }
     const [cmd, ...args] = input.split(' ');
     if (this.commands[cmd]) {
       this.commands[cmd].action(args);
-      // For 'cd', print cwd after changing directory
-      if (cmd === 'cd') {
-        this.print(this.cwd);
-      }
-      // For 'touch', print file name after creation
-      if (cmd === 'touch' && args[0]) {
-        this.print(args[0]);
-      }
     } else {
       this.print(`Command not recognized: ${cmd}.`);
     }
@@ -346,32 +324,33 @@ export class CentralTerminal {
   }
 }
 
-export class Command {
-  constructor(name, description, action) {
-    this.name = name;
-    this.description = description;
-    this.action = action;
-  }
-}
-
-export class Addon {
-  constructor(name) {
-    this.name = name;
-  }
-  onStart(term) {}
-  onCommand(input) {}
-  onStop() {}
+// --- Command Class (single, exported) ---
+class Command {
+    constructor(name, description, execute, aliases = []) {
+        this.name = name;
+        this.description = description;
+        this.execute = execute;
+        this.aliases = aliases;
+        // Fix: support both function and { action: fn } object
+        if (typeof execute === 'function') {
+            this.action = execute;
+        } else if (execute && typeof execute.action === 'function') {
+            this.action = execute.action;
+        } else {
+            this.action = () => {};
+        }
+    }
 }
 
 // Export all class for developers
-export { 
-    VFile,
-    VDirectory,
+module.exports = {
+    CentralTerminal,
     Command,
     Addon,
     AddonExecutor,
+    VFile,
+    VDirectory,
     VOS,
     BootCheck,
-    BootCheckRegistry,
-    CentralTerminal
- };
+    BootCheckRegistry
+};

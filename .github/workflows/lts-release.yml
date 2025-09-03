@@ -8,7 +8,7 @@ on:
 jobs:
   publish-lts:
     runs-on: ubuntu-latest
-
+    
     steps:
       # Step 1: Check out the repository's code.
       # The token is required to push the version commit and tag back to the repo.

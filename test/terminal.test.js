@@ -1,11 +1,9 @@
-// We recommend installing an extension to run jest tests.
-import { CentralTerminal, Addon, Command } from '../src/terminal.js';
+const { CentralTerminal, Command, Addon } = require('../src/terminal.js');
 
 describe('CentralTerminal', () => {
   let container, output, input;
 
   beforeEach(() => {
-    // Mock DOM elements
     container = document.createElement('div');
     container.id = 'terminal-container';
     output = document.createElement('div');
@@ -16,7 +14,7 @@ describe('CentralTerminal', () => {
     container.appendChild(input);
     document.body.appendChild(container);
 
-    // Mock BIOS and pseudo-terminal screens
+    // BIOS and pseudo-terminal mocks
     const biosScreen = document.createElement('div');
     biosScreen.id = 'bios-screen';
     document.body.appendChild(biosScreen);
@@ -34,11 +32,9 @@ describe('CentralTerminal', () => {
 
   it('should initialize with default commands', () => {
     const term = new CentralTerminal('#terminal-container');
-    expect(Object.keys(term.commands)).toContain('pwd');
-    expect(Object.keys(term.commands)).toContain('ls');
-    expect(Object.keys(term.commands)).toContain('cd');
-    expect(Object.keys(term.commands)).toContain('cat');
-    expect(Object.keys(term.commands)).toContain('help');
+    expect(Object.keys(term.commands)).toEqual(
+      expect.arrayContaining(['pwd', 'ls', 'cd', 'cat', 'touch', 'help', 'run', 'exit'])
+    );
   });
 
   it('should print output', () => {
@@ -115,5 +111,39 @@ describe('CentralTerminal', () => {
     expect(output.textContent).toContain('Addon received: hello');
     term.runCommand('exit');
     expect(output.textContent).toContain('Returned to main terminal.');
+  });
+});
+
+describe('Command', () => {
+  it('should create a command with function', () => {
+    const cmd = new Command('test', 'desc', () => {});
+    expect(cmd.name).toBe('test');
+    expect(cmd.description).toBe('desc');
+    expect(typeof cmd.action).toBe('function');
+  });
+
+  it('should create a command with action object', () => {
+    const cmd = new Command('test', 'desc', { action: () => 'ok' });
+    expect(typeof cmd.action).toBe('function');
+    expect(cmd.action()).toBe('ok');
+  });
+});
+
+describe('Addon', () => {
+  it('should instantiate Addon and call lifecycle methods', () => {
+    class MyAddon extends Addon {
+      constructor(name) { super(name); this.started = false; }
+      onStart(term) { this.started = true; }
+      onCommand(input) { this.lastInput = input; }
+      onStop() { this.stopped = true; }
+    }
+    const addon = new MyAddon('myaddon');
+    expect(addon.name).toBe('myaddon');
+    addon.onStart();
+    expect(addon.started).toBe(true);
+    addon.onCommand('foo');
+    expect(addon.lastInput).toBe('foo');
+    addon.onStop();
+    expect(addon.stopped).toBe(true);
   });
 });
