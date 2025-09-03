@@ -1,20 +1,14 @@
-import { CentralTerminal } from '/src/index.js';
+import { CentralTerminal } from '../src/index.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const terminalOutput = document.getElementById('terminalOutput');
-    const biosOutput = document.getElementById('bios-output');
+    const term = new CentralTerminal('#central-terminal-container');
     const commandInput = document.getElementById('terminal-command-input');
+    const terminalOutput = document.getElementById('terminalOutput');
 
-    const term = new CentralTerminal(terminalOutput, biosOutput, {
-        enableInput: true,
-        prompt: '$&gt; ',
-    });
+    // The boot() method handles all BIOS-level output. These are not needed.
+    // term.print('BIOS loaded...\n');
+    // term.print('Initializing core systems...\n');
 
-    // --- Boot Sequence ---
-    term.print('BIOS loaded...\n');
-    term.print('Initializing core systems...\n');
-
-    // --- Boot Check Example ---
     term.addBootCheck({
         name: 'System Integrity Check',
         check: () => {
@@ -24,20 +18,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    term.runBootChecks().then(() => {
-        term.print('\nWelcome to the CWP Terminal Emulator!\n');
-        term.print('Type `help` to see a list of available commands.\n\n');
+    term.boot().then(() => {
+        // Print welcome messages correctly, relying on the new print() method for newlines.
+        term.print('Welcome to the CWP Terminal Emulator!');
+        term.print("Type 'help' to see a list of available commands.");
+        term.print(''); // Add a blank line for spacing.
         commandInput.focus();
     });
 
-    // --- Handle User Input ---
     commandInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const command = commandInput.value;
-            term.print(`\n<span class="prompt">$&gt;</span> ${command}\n`); // Echo command
-            term.run(command);
-            commandInput.value = ''; // Clear input
-            terminalOutput.scrollTop = terminalOutput.scrollHeight; // Scroll to bottom
+            // Echo the command with the prompt for a clean, consistent look.
+            term.print(`S> ${command}`);
+            term.runCommand(command);
+            commandInput.value = '';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
         }
     });
 });

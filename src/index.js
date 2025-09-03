@@ -1,1 +1,1 @@
-export { CentralTerminal, Command, BootCheck, Addon } from './terminal.js';
+export * from './terminal.js';
