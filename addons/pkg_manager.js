@@ -1,4 +1,4 @@
-import { Addon } from '../terminal.js';
+import { Addon } from '/src/index.js';
 
 const addonRegistry = {
     'cowsay': 'https://raw.githubusercontent.com/user/repo/branch/path/to/cowsay.js',

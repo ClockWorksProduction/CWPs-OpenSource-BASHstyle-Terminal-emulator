@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CWP Terminal Test</title>
+</head>
+<body>
+  <h1>CWP Open Terminal Emulator - Manual Test</h1>
+  <div id="central-terminal-container">
+    <div id="bios-output"></div>
+    <div id="terminalOutput" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; background: #333; color: #eee;"></div>
+    <div class="terminal-input-line">
+        <span class="prompt" style="color: #0f0;">$&gt;</span>
+        <input type="text" id="terminal-command-input" autofocus style="background: #333; color: #eee; border: none; width: 90%;" />
+    </div>
+  </div>
+  <script src="app.js" type="module"></script>
+</body>
+</html>

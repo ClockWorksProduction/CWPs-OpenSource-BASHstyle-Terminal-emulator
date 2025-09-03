@@ -35,7 +35,7 @@ class AddonExecutor {
         if (this.activeAddon) { term.print("An addon is already running. Please 'exit' first."); return; }
         const addon = this.addons[name.toLowerCase()];
         if (addon) {
-            term.printHtml(`<p style="color: yellow;">This addon runs in your browser. Only install trusted addons from official sources. Use at your own risk.</p>`);
+            term.printHtml(`<p style=\"color: yellow;\">This addon runs in your browser. Only install trusted addons from official sources. Use at your own risk.</p>`);
             this.activeAddon = addon;
             addon.onStart(term, vOS, ...args);
         } else {
@@ -190,7 +190,7 @@ class BootCheckRegistry {
         for (const check of this.checks) {
             terminal.biosOutput.innerHTML += `<p>Running: ${check.name}... </p>`;
             const result = await terminal.bootCheck(check.check);
-            terminal.biosOutput.innerHTML += `<span class="status-${result.status}">${result.message}</span>`;
+            terminal.biosOutput.innerHTML += `<span class=\"status-${result.status}\">${result.message}</span>`;
             if (result.status === 'failed') allOk = false;
         }
         return allOk;
@@ -203,8 +203,10 @@ class CentralTerminal {
     this.container = document.querySelector(containerSelector);
     this.output = this.container.querySelector('#terminalOutput') || document.getElementById('terminalOutput');
     this.input = this.container.querySelector('#terminal-command-input') || document.getElementById('terminal-command-input');
+    this.biosOutput = document.getElementById('bios-output');
     this.commands = {};
     this.bootChecks = [];
+    this.bootCheckRegistry = new BootCheckRegistry();
     this.addons = {};
     this.activeAddon = null;
     // Match test expectations: start in /user
@@ -309,14 +311,22 @@ class CentralTerminal {
     this.bootChecks.push(check);
   }
 
-  async boot() {
-    const biosOutput = document.getElementById('bios-output');
-    if (biosOutput) biosOutput.innerHTML = 'Booting...<br>';
-    for (const check of this.bootChecks) {
-      const result = await check.check();
-      if (biosOutput) biosOutput.innerHTML += `${check.name}: ${result ? 'OK' : 'FAIL'}<br>`;
+    async bootCheck(checkFunction) {
+        try {
+            const result = await checkFunction();
+            return { status: result ? 'ok' : 'failed', message: result ? 'OK' : 'FAIL' };
+        } catch (error) {
+            return { status: 'failed', message: `FAIL: ${error.message}` };
+        }
     }
-    if (biosOutput) biosOutput.innerHTML += 'Booting complete.<br>';
+
+  async boot() {
+    if (this.biosOutput) this.biosOutput.innerHTML = 'Booting...<br>';
+    for (const check of this.bootChecks) {
+        const result = await this.bootCheck(check.check);
+        if (this.biosOutput) this.biosOutput.innerHTML += `${check.name}: ${result.message}<br>`;
+    }
+    if (this.biosOutput) this.biosOutput.innerHTML += 'Booting complete.<br>';
   }
 
   registerAddon(addon) {

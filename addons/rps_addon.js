@@ -1,4 +1,4 @@
-import { Addon } from '../../src/terminal.js';
+import { Addon } from '/src/index.js';
 
 class RockPaperScissorsAddon extends Addon {
     constructor() {
@@ -25,25 +25,24 @@ class RockPaperScissorsAddon extends Addon {
                 this.printHelp();
                 break;
             default:
-                this.term.print(`Unknown command: ${command}. Type \'help\' for a list of commands.`);
+                this.term.print(`Unknown command: ${command}. Type 'help' for a list of commands.`);
                 break;
         }
     }
 
     play(playerChoice) {
-        const choices = ['rock', 'paper', 'scissors'];
-        if (!choices.includes(playerChoice)) {
-            this.term.print(`Invalid choice: ${playerChoice}. Please choose rock, paper, or scissors.`);
+        if (!['rock', 'paper', 'scissors'].includes(playerChoice)) {
+            this.term.print('Invalid choice. Please choose rock, paper, or scissors.');
             return;
         }
 
+        const choices = ['rock', 'paper', 'scissors'];
         const computerChoice = choices[Math.floor(Math.random() * choices.length)];
 
-        this.term.print(`You chose: ${playerChoice}`);
-        this.term.print(`Computer chose: ${computerChoice}`);
+        this.term.print(`You chose ${playerChoice}, computer chose ${computerChoice}.`);
 
         if (playerChoice === computerChoice) {
-            this.term.print("It's a tie!");
+            this.term.print('It\'s a tie!');
         } else if (
             (playerChoice === 'rock' && computerChoice === 'scissors') ||
             (playerChoice === 'paper' && computerChoice === 'rock') ||
@@ -52,14 +51,13 @@ class RockPaperScissorsAddon extends Addon {
             this.term.print('You win!');
             this.playerScore++;
         } else {
-            this.term.print('You lose!');
+            this.term.print('You lose.');
             this.computerScore++;
         }
-        this.printScore();
     }
 
     printScore() {
-        this.term.print(`Score: You ${this.playerScore} - ${this.computerScore} Computer`);
+        this.term.print(`Player: ${this.playerScore}, Computer: ${this.computerScore}`);
     }
 
     printHelp() {

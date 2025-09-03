@@ -1,4 +1,4 @@
-import { Addon } from '../terminal.js';
+import { Addon } from '/src/index.js';
 
 class NetAddon extends Addon {
     constructor() {
