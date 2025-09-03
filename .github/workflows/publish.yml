@@ -1,65 +1,58 @@
 
-name: Publish to npm
+# GitHub Action for automatic dev release publishing to npm
+
+name: Publish Dev Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*' # Trigger on tags like v1.0.0
-  schedule:
-    # Run on the 1st and 15th of every month at midnight UTC
-    - cron: '0 0 1,15 * *'
-  workflow_dispatch: # Allows manual triggering
+    branches:
+      # This workflow runs on every push to the main branch.
+      # Change this if your primary branch has a different name (e.g., master).
+      - main
 
 jobs:
-  publish:
+  publish-dev:
+    # Use the latest version of Ubuntu for the runner environment
     runs-on: ubuntu-latest
+
     steps:
+      # Step 1: Check out the repository's code so the workflow can access it.
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # Step 2: Set up the Node.js environment.
+      # Specifies Node.js version 18 and the npm registry URL.
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18' # Specify your node version
-          registry-url: 'https://registry.npmjs.org/'
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
 
+      # Step 3: Install project dependencies using 'npm ci'.
+      # 'npm ci' is recommended for CI environments as it provides faster, more reliable builds.
       - name: Install dependencies
         run: npm ci
 
-      # Optional: Add a build step if you have one
-      # - name: Build project
-      #   run: npm run build
-
-      - name: Determine Version and NPM Tag
-        id: get_version
+      # Step 4: Create a unique dev version and publish to npm.
+      - name: Create dev version and publish
         run: |
-          if [[ $GITHUB_EVENT_NAME == 'push' && $GITHUB_REF_TYPE == 'tag' ]]; then
-            # Stable release from git tag
-            VERSION=${GITHUB_REF_NAME#v}
-            NPM_TAG=latest
-            echo "Publishing stable release: $VERSION"
-          elif [[ $GITHUB_EVENT_NAME == 'schedule' ]]; then
-            # Bi-weekly release, tagged as 'nightly'
-            BASE_VERSION=$(node -p "require('./package.json').version")
-            # Using date for versioning to ensure uniqueness
-            VERSION="$BASE_VERSION-nightly.$(date +%Y%m%d)"
-            NPM_TAG=nightly
-            echo "Bumping version to $VERSION for bi-weekly release"
-            npm version $VERSION --no-git-tag-version
-            echo "Publishing bi-weekly release with tag 'nightly': $VERSION"
-          else
-            # Manual dev release
-            BASE_VERSION=$(node -p "require('./package.json').version")
-            VERSION="$BASE_VERSION-dev.$(date +%s)"
-            NPM_TAG=dev
-            echo "Bumping version to $VERSION for dev release"
-            npm version $VERSION --no-git-tag-version
-            echo "Publishing dev release: $VERSION"
-          fi
-          echo "NPM_TAG=$NPM_TAG" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Get the latest published version from npm (e.g., 4.0.7).
+          LATEST_VERSION=$(npm view . version)
 
-      - name: Publish to npm
-        run: npm publish --tag ${{ env.NPM_TAG }}
+          # Get the short hash of the current commit (e.g., a1b2c3d).
+          COMMIT_HASH=$(echo $GITHUB_SHA | head -c 7)
+
+          # Create the new dev version string (e.g., 4.0.7-dev.a1b2c3d).
+          DEV_VERSION="$LATEST_VERSION-dev.$COMMIT_HASH"
+          
+          # Update package.json with the new version.
+          # The --no-git-tag-version flag prevents it from creating a git tag.
+          echo "Bumping version to $DEV_VERSION"
+          npm version $DEV_VERSION --no-git-tag-version
+          
+          # Publish the package to npm with the 'dev' tag.
+          # This makes it installable via 'npm install your-package@dev'.
+          npm publish --tag dev
         env:
+          # The action uses the NPM_TOKEN secret to authenticate with npm.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
