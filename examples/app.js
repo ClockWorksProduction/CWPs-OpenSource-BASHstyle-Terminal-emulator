@@ -1,7 +1,11 @@
-import { CentralTerminal } from '../dist/terminal.js';
-import { BootCheck } from '../dist/boot-checks.js';
-import { Command } from '../dist/command.js';
-import { ImageAddon } from './image-addon.js';
+import { CentralTerminal, BootCheck, Command } from '../src/index.js';
+
+// Import official addons
+import { register as registerRPS } from '../addons/rps_addon.js';
+import { register as registerEditor } from '../addons/editor.js';
+import { register as registerPkgManager } from '../addons/pkg_manager.js';
+import { register as registerTop } from '../addons/top.js';
+import { register as registerNet } from '../addons/net.js';
 
 const terminal = new CentralTerminal('#pseudo-terminal');
 
@@ -28,7 +32,19 @@ const cowsay = new Command('cowsay', 'Displays a cow with a message.', (args) =>
 });
 terminal.addCommand(cowsay);
 
+// A command to handle Ctrl+C
+const ctrlC = new Command('Ctrl+C', 'Exits the current addon', () => {
+    if (terminal.addonExecutor.getActiveAddon()) {
+        terminal.addonExecutor.getActiveAddon().onInput('Ctrl+C');
+    }
+});
+terminal.addCommand(ctrlC);
+
 // Register addons
-terminal.registerAddon(new ImageAddon());
+registerRPS(terminal.addonExecutor);
+registerEditor(terminal.addonExecutor);
+registerPkgManager(terminal.addonExecutor);
+registerTop(terminal.addonExecutor);
+registerNet(terminal.addonExecutor);
 
 terminal.boot();

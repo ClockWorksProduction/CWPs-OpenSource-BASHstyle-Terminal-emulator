@@ -9,7 +9,7 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 - **BASH-like Environment:** Familiar commands like `ls`, `cd`, `cat`, `mkdir`, `pwd`, `rm`, `echo`, and `history`.
 - **Virtual File System:** An in-memory file system to simulate file and directory operations.
 - **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
-- **Easy Integration:** Import and initialize the terminal with just a few lines of code.
+- **Lightweight Core:** The core terminal is minimal, allowing you to add only the features you need.
 
 ## Releases
 
@@ -71,7 +71,39 @@ npx cwp-terminal-setup
 
 ### 2. Manual Setup
 
-If you prefer to set things up yourself, our **[Manual Setup Guide (docs/SETUP.md)](docs/SETUP.md)** provides a complete walkthrough.
+If you prefer to set things up yourself, you can easily import the core terminal and add official addons.
+
+1.  **Import the Core Terminal:**
+
+    ```javascript
+    import { CentralTerminal } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
+    ```
+
+2.  **Initialize the Terminal:**
+
+    ```javascript
+    const terminal = new CentralTerminal('#your-terminal-element-id');
+    ```
+
+3.  **(Optional) Add Official Addons:**
+    The core terminal is lightweight. You can add official addons for more functionality. Each addon is imported separately from the `addons` directory.
+
+    ```javascript
+    // Import the register function from an addon
+    import { register as registerEditor } from '@clockworksproduction-studio/cwp-open-terminal-emulator/addons/editor.js';
+
+    // Register the addon with the terminal's addon executor
+    registerEditor(terminal.addonExecutor);
+    ```
+
+4.  **Boot the Terminal:**
+
+    ```javascript
+    terminal.boot();
+    ```
+
+For a complete walkthrough, see our **[Manual Setup Guide (docs/SETUP.md)](docs/SETUP.md)**.
+
 
 ## Documentation
 

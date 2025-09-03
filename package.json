@@ -2,13 +2,18 @@
   "name": "@clockworksproduction-studio/cwp-open-terminal-emulator",
   "version": "4.1.3",
   "description": "A modular, BASH-style terminal emulator library for the web.",
-  "main": "src/terminal.js",
-  "module": "src/terminal.js",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./addons/*": "./addons/*.js"
+  },
   "bin": {
     "cwp-terminal-setup": "bin/cwp-terminal-setup.js"
   },
   "files": [
     "src",
+    "addons",
     "bin",
     "LICENSE",
     "README.md",
