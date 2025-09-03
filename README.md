@@ -13,7 +13,7 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 
 ## Releases
 
-This project provides three distinct release channels on npm to suit your needs.
+This project provides four distinct release channels on npm to suit your needs.
 
 ### Stable Release (`@latest`)
 
@@ -35,9 +35,19 @@ Receives critical bug fixes for a specific major version, providing maximum stab
 npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
 ```
 
-### Nightly Development Release (`@dev`)
+### Nightly Release (`@nightly`)
 
-Published automatically from the `main` branch. It's great for testing new features but may be unstable.
+A more stable pre-release version, published bi-weekly. Ideal for developers who want to test upcoming features without being on the commit-by-commit bleeding edge.
+
+[![npm version (nightly)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
+
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
+```
+
+### Dev Release (`@dev`)
+
+The most unstable, bleeding-edge version, published with every single commit to the `main` branch.
 
 [![npm version (dev)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
 

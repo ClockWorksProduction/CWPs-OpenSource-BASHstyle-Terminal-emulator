@@ -1,14 +1,15 @@
 # Release & Publishing Guide
 
-This document outlines the automated release system for the CWP Open Terminal Emulator, designed to streamline development and provide clear release channels for users. The system uses GitHub Actions to manage versioning and publishing to the npm registry.
+This document outlines the automated release system for the CWP Open Terminal Emulator. The system uses GitHub Actions to manage versioning and publishing to the npm registry, providing clear and distinct release channels for different user needs.
 
 ## Overview of Release Channels
 
-Our project utilizes a three-tier release system, each serving a different purpose and user base:
+Our project utilizes a four-tier release system:
 
-1.  **Nightly Development Release**: The most up-to-date version, automatically built and published from the `main` branch. Ideal for developers who need the absolute latest changes.
-2.  **Stable Release (`@latest`)**: The official, production-ready version. This is the default release for most users.
-3.  **Long-Term Support (`@lts`)**: A specific major version line that receives critical bug fixes for an extended period, providing maximum stability for large or legacy projects.
+1.  **Dev Release (`@dev`)**: The most unstable, bleeding-edge version. A new version is published with every single commit to the `main` branch.
+2.  **Nightly Release (`@nightly`)**: A more stable pre-release version, published bi-weekly. This is ideal for developers who want to test upcoming features without being on the commit-by-commit bleeding edge.
+3.  **Stable Release (`@latest`)**: The official, production-ready version. This is the default release for most users.
+4.  **Long-Term Support (`@lts`)**: A specific major version line that only receives critical bug fixes, providing maximum stability for large or legacy projects.
 
 ### Prerequisite: NPM Token
 
@@ -21,16 +22,16 @@ All workflows require a secret token to authenticate with the npm registry. This
 
 ---
 
-## 1. Nightly Development Release
+## 1. Dev Release (`@dev`)
 
-This workflow ensures that the latest code from the `main` branch is always available for testing.
+This workflow ensures that the absolute latest code from the `main` branch is always available for immediate testing.
 
 *   **Tag on npm**: `@dev`
 *   **Trigger**: Runs automatically on every `git push` to the `main` branch.
-*   **Workflow file**: `.github/workflows/publish.yml`
+*   **Workflow file**: `.github/workflows/dev-release.yml`
 *   **Versioning**: Generates a unique version by combining the latest version with the commit hash (e.g., `4.0.7-dev.a1b2c3d`).
 
-### Installing the Nightly Version
+### Installing the Dev Version
 
 ```bash
 npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
@@ -38,57 +39,46 @@ npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
 
 ---
 
-## 2. Stable Release (`@latest`)
+## 2. Nightly Release (`@nightly`)
 
-This workflow provides a controlled process for publishing official, stable releases to the public.
+This workflow provides a regularly scheduled, more stable pre-release for testing.
+
+*   **Tag on npm**: `@nightly`
+*   **Trigger**: Runs on a schedule (bi-weekly at 03:00 UTC on the 1st and 15th of the month). It can also be triggered manually.
+*   **Workflow file**: `.github/workflows/nightly-release.yml`
+*   **Versioning**: Creates a pre-release version, like `4.1.0-nightly.0`.
+
+### Installing the Nightly Version
+
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
+```
+
+---
+
+## 3. Stable Release (`@latest`)
+
+This workflow provides a controlled process for publishing official, stable releases.
 
 *   **Tag on npm**: `@latest`
 *   **Trigger**: Must be run manually from the repository's "Actions" tab against the `main` branch.
 *   **Workflow file**: `.github/workflows/release.yml`
-*   **Versioning**: Asks for a `patch`, `minor`, or `major` bump. It then automatically increments the version, creates a Git tag (e.g., `v4.1.0`), and pushes the changes back to `main`.
-
-### How to Publish a Stable Release
-
-1.  Ensure the `main` branch is up-to-date and ready for release.
-2.  Navigate to the **Actions** tab and select the **"Release Stable Version"** workflow.
-3.  Click **"Run workflow"**, choose the version bump, and run the action.
+*   **Versioning**: Asks for a `patch`, `minor`, or `major` bump. It then automatically increments the version and creates a Git tag (e.g., `v4.1.0`).
 
 ---
 
-## 3. Long-Term Support (LTS) Release
+## 4. Long-Term Support (LTS) Release (`@lts`)
 
-The LTS channel is for providing critical bug fixes to a previous major version, without introducing new features or breaking changes.
+The LTS channel is for providing critical bug fixes to a previous major version.
 
 *   **Tag on npm**: `@lts`
-*   **Trigger**: Must be run manually from the "Actions" tab against a dedicated LTS branch (e.g., `release/v4`).
+*   **Trigger**: Must be run manually against a dedicated LTS branch (e.g., `release/v4`).
 *   **Workflow file**: `.github/workflows/lts-release.yml`
 *   **Versioning**: Automatically performs a `patch` bump on the current version of the LTS branch.
 
 ### How to Manage and Publish an LTS Release
 
-**A. Setting up a new LTS Branch:**
-
-When a new MAJOR version is released (e.g., `v5.0.0`), the previous major line (v4) can become an LTS line.
-
-1.  From the `main` branch at the point of the last v4 release, create a new branch:
-    ```bash
-    git checkout -b release/v4 <last_v4_commit_hash>
-    git push origin release/v4
-    ```
-
-**B. Backporting a Bug Fix:**
-
-1.  First, commit the bug fix to the `main` branch as usual.
-2.  Switch to the LTS branch: `git checkout release/v4`.
-3.  Use `git cherry-pick <commit_hash_of_fix>` to apply just that fix to the LTS branch.
-4.  Push the cherry-picked commit: `git push`.
-
-**C. Publishing the LTS Patch:**
-
-1.  Navigate to the **Actions** tab and select the **"Release LTS Version"** workflow.
-2.  Click the **"Run workflow"** dropdown.
-3.  **Crucially, select the correct LTS branch** (e.g., `release/v4`) from the branch dropdown.
-4.  Run the workflow. It will publish the new patch (e.g., `v4.1.9`) to npm with the `@lts` tag.
+For detailed instructions on setting up LTS branches and backporting fixes, please refer to the workflow comments in the `.github/workflows/lts-release.yml` file.
 
 ### Installing the LTS Version
 
