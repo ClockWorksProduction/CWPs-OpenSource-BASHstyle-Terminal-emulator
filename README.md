@@ -13,11 +13,11 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 
 ## Releases
 
-This project has two primary release channels available on npm.
+This project provides three distinct release channels on npm to suit your needs.
 
-### Stable Release (Latest)
+### Stable Release (`@latest`)
 
-The stable release is the official, production-ready version recommended for most users.
+The official, production-ready version recommended for most users.
 
 [![npm version (stable)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
 
@@ -25,9 +25,19 @@ The stable release is the official, production-ready version recommended for mos
 npm install @clockworksproduction-studio/cwp-open-terminal-emulator@latest
 ```
 
-### Development Release (Dev)
+### Long-Term Support Release (`@lts`)
 
-The development release is published automatically from the latest commit to the `main` branch. It's great for testing new features but may be unstable.
+Receives critical bug fixes for a specific major version, providing maximum stability for large or legacy projects.
+
+[![npm version (lts)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
+
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
+```
+
+### Nightly Development Release (`@dev`)
+
+Published automatically from the `main` branch. It's great for testing new features but may be unstable.
 
 [![npm version (dev)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
 
@@ -51,13 +61,18 @@ npx cwp-terminal-setup
 
 ### 2. Manual Setup
 
-If you prefer to set things up yourself, our **[Manual Setup Guide (docs/SETUP.md)](docs/SETUP.md)** provides a complete walkthrough from installation to a fully functional terminal.
+If you prefer to set things up yourself, our **[Manual Setup Guide (docs/SETUP.md)](docs/SETUP.md)** provides a complete walkthrough.
 
 ## Documentation
 
 - [Addon System](docs/addons.md)
 - [Release & Publishing Guide](docs/release-system.md)
 - [Troubleshooting and FAQ](docs/troubleshooting.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
+
+## Contributing
+
+We welcome contributions from the community! Whether it's reporting a bug, suggesting a feature, or submitting code, your help is appreciated. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** to get started.
 
 ## License
 
@@ -68,7 +83,5 @@ This project is licensed under the GNU Lesser General Public License v3.0 or lat
 ✅ You may distribute applications that link to this library under any license you choose.
 
 ⚠️ If you modify this library itself and distribute your changes, you must publish them under the LGPLv3 as well.
-
-This ensures the core library remains open source, while still allowing broad use and integration in proprietary or open projects.
 
 See the [LICENSE](LICENSE) file for the full license text.

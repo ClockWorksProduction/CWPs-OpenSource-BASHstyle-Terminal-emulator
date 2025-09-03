@@ -1,0 +1,52 @@
+# GitHub Action for manually triggering an LTS release
+
+name: Release LTS Version
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-lts:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository's code.
+      # The token is required to push the version commit and tag back to the repo.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for versioning
+
+      # Step 2: Set up the Node.js environment.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Step 3: Configure Git user details.
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Step 4: Install dependencies.
+      - name: Install dependencies
+        run: npm ci
+
+      # Step 5: Bump the version, create a commit, and tag it.
+      # LTS releases should only ever be patches.
+      - name: Bump version and create tag
+        run: npm version patch -m "chore(release-lts): %s"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 6: Push the new commit and tag to the repository branch.
+      - name: Push changes to repository
+        run: git push --follow-tags
+
+      # Step 7: Publish the package to npm with the 'lts' tag.
+      - name: Publish to npm
+        run: npm publish --tag lts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

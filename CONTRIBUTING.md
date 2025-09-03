@@ -1,20 +1,14 @@
 # Contributing to CWP Open Terminal Emulator
 
-First of all, thank you for considering contributing to this project! We welcome all contributions, from simple bug reports to new features and addons.
-
-## Code of Conduct
-
-To ensure a welcoming and friendly environment, we expect all contributors to adhere to our [Code of Conduct](CODE_OF_CONDUCT.md). Please read it before contributing.
+First off, thank you for considering contributing to the project! We welcome any help, from reporting a bug to submitting a feature.
 
 ## How to Contribute
 
-### Reporting Bugs
+There are many ways to contribute:
 
-If you find a bug, please create an issue in our [GitHub issue tracker](https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/issues). Please include a clear description of the bug, steps to reproduce it, and any relevant error messages.
-
-### Suggesting Enhancements
-
-If you have an idea for a new feature or an improvement to an existing one, please create an issue to discuss it. This allows us to coordinate our efforts and ensure that your contribution is in line with the project's goals.
+*   **Reporting Bugs**: If you find a bug, please open an issue and provide as much detail as possible, including steps to reproduce it.
+*   **Suggesting Enhancements**: If you have an idea for a new feature or an improvement, open an issue to discuss it.
+*   **Submitting Pull Requests**: If you want to contribute code, please follow the guidelines below.
 
 ### Submitting Pull Requests
 
@@ -31,11 +25,6 @@ All contributions to this project must be licensed under the **GNU Lesser Genera
 
 To maintain a consistent and readable codebase, we ask that you follow these coding style guidelines:
 
-*   **Indentation:** Use 4 spaces for indentation.
-*   **Naming Conventions:**
-    *   Use `PascalCase` for class names (e.g., `CentralTerminal`, `MyAddon`).
-    *   Use `camelCase` for variables and functions (e.g., `newCommand`, `onStart`).
-*   **Comments:** Write clear and concise comments to explain complex or non-obvious code.
-*   **Semicolons:** Use semicolons at the end of statements.
-
-Thank you for your interest in contributing to the CWP Open Terminal Emulator!
+*   Follow the existing code style. (We will add a linter and formal style guide later).
+*   Write clear and concise comments for complex logic.
+*   Ensure your code is well-tested.
