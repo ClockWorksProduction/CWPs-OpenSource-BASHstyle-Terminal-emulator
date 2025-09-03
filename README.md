@@ -1,6 +1,5 @@
 # CWP Open Terminal Emulator
 
-[![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 
 A modular, BASH-style terminal emulator library for the web. CWP Open Terminal Emulator is a lightweight, extensible, and easy-to-integrate solution for adding a terminal interface to your web applications.
@@ -11,6 +10,30 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 - **Virtual File System:** An in-memory file system to simulate file and directory operations.
 - **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
 - **Easy Integration:** Import and initialize the terminal with just a few lines of code.
+
+## Releases
+
+This project has two primary release channels available on npm.
+
+### Stable Release (Latest)
+
+The stable release is the official, production-ready version recommended for most users.
+
+[![npm version (stable)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
+
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@latest
+```
+
+### Development Release (Dev)
+
+The development release is published automatically from the latest commit to the `main` branch. It's great for testing new features but may be unstable.
+
+[![npm version (dev)](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
+
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
+```
 
 ## Getting Started
 
@@ -28,25 +51,12 @@ npx cwp-terminal-setup
 
 ### 2. Manual Setup
 
-If you prefer to set things up yourself, our **[Manual Setup Guide (SETUP.md)](SETUP.md)** provides a complete walkthrough from installation to a fully functional terminal.
-
-## Installation
-
-If you use the manual setup, you'll need to install the package first.
-
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator
-```
-
-or 
-
-```bash
-npm i @clockworksproduction-studio/cwp-open-terminal-emulator
-```
+If you prefer to set things up yourself, our **[Manual Setup Guide (docs/SETUP.md)](docs/SETUP.md)** provides a complete walkthrough from installation to a fully functional terminal.
 
 ## Documentation
 
 - [Addon System](docs/addons.md)
+- [Release & Publishing Guide](docs/release-system.md)
 - [Troubleshooting and FAQ](docs/troubleshooting.md)
 
 ## License
