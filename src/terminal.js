@@ -3,12 +3,10 @@
 // v4.1.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
 // ==========================
 
-// --- VFile and VDirectory Classes ---
 class VFile {
-    constructor(name, content = '', type = 'text') {
+    constructor(name, content = '') {
         this.name = name;
         this.content = content;
-        this.type = type;
     }
 }
 
@@ -20,64 +18,27 @@ class VDirectory {
     getChild(name) { return this.children[name]; }
 }
 
-// --- Addon Handling ---
-class Addon {
-    constructor(name) { this.name=name; this.term=null; this.vOS=null; }
-    onStart(term, vOS, ...args) { this.term=term; this.vOS=vOS; this.args = args;}
-    onCommand(input) { this.term.print(`[${this.name}]> ${input}`); }
-    onStop() { }
-}
-
-class AddonExecutor {
-    constructor() { this.addons={}; this.activeAddon=null; }
-    registerAddon(addon) { this.addons[addon.name.toLowerCase()] = addon; }
-    startAddon(name, term, vOS, ...args) {
-        if (this.activeAddon) { term.print("An addon is already running. Please 'exit' first."); return; }
-        const addon = this.addons[name.toLowerCase()];
-        if (addon) {
-            term.printHtml(`<p style=\"color: yellow;\">This addon runs in your browser. Only install trusted addons from official sources. Use at your own risk.</p>`);
-            this.activeAddon = addon;
-            addon.onStart(term, vOS, ...args);
-        } else {
-            term.print(`Addon not found: ${name}`);
-        }
-    }
-    stopAddon(term) {
-        if (this.activeAddon) {
-            this.activeAddon.onStop();
-            this.activeAddon = null;
-            if (term) term.print("Returned to main terminal.");
-        }
-    }
-    handleCommand(input) { if (this.activeAddon) this.activeAddon.onCommand(input); }
-}
-
-// --- VirtualOS Class ---
 class VOS {
     constructor() {
         this.root = new VDirectory('/');
         this.cwd = this.root;
-        this._initializeFileSystem();
-    }
-
-    _initializeFileSystem() {
-        this.createDirectory('/home');
-        this.createDirectory('/home/user');
-        this.createDirectory('/bin');
-        this.createDirectory('/etc');
-        this.createFile('/etc/motd', 'Welcome to the Central Terminal!');
-        this.createFile('/home/user/README.txt', 'This is a README file.');
+        this.createDirectory('/user');
+        this.cwd = this.root.getChild('user');
     }
 
     _resolvePath(path) {
-        if (path === '/') return this.root;
-        let parts = path.split('/').filter(p => p.length > 0);
         let current = path.startsWith('/') ? this.root : this.cwd;
-        for (let part of parts) {
-            if (part === '..') current = this._getParent(current) || current;
-            else if (part !== '.') {
-                if (current instanceof VDirectory && current.getChild(part)) current = current.getChild(part);
-                else return null;
+        const parts = path.split('/').filter(p => p);
+
+        for (const part of parts) {
+            if (part === '..') {
+                current = this._getParent(current) || current;
+            } else if (part !== '.') {
+                if (current instanceof VDirectory && current.getChild(part)) {
+                    current = current.getChild(part);
+                } else {
+                    return null; // Path not found
+                }
             }
         }
         return current;
@@ -98,7 +59,7 @@ class VOS {
         return findParent(this.root, node);
     }
 
-    _getFullPath(directory) {
+    getFullPath(directory) {
         if (directory === this.root) return '/';
         let path = '';
         let current = directory;
@@ -106,28 +67,16 @@ class VOS {
             path = '/' + current.name + path;
             current = this._getParent(current);
         }
-        return '/C/Users/user' + (path || '/');
+        return path || '/';
     }
 
-    createFile(path, content = '', type = 'text') {
+    createFile(path, content = '') {
         const parts = path.split('/');
         const filename = parts.pop();
-        const dirPath = parts.join('/');
+        const dirPath = parts.join('/') || '/';
         const directory = this._resolvePath(dirPath);
         if (directory instanceof VDirectory && !directory.children[filename]) {
-            directory.children[filename] = new VFile(filename, content, type);
-            return true;
-        }
-        return false;
-    }
-    
-    deleteFile(path) {
-        const parts = path.split('/');
-        const filename = parts.pop();
-        const dirPath = parts.join('/');
-        const directory = this._resolvePath(dirPath);
-        if (directory instanceof VDirectory && directory.getChild(filename) instanceof VFile) {
-            delete directory.children[filename];
+            directory.children[filename] = new VFile(filename, content);
             return true;
         }
         return false;
@@ -135,8 +84,8 @@ class VOS {
 
     createDirectory(path) {
         const parts = path.split('/');
-        const dirname = parts.pop() || path;
-        const parentPath = parts.join('/');
+        const dirname = parts.pop();
+        const parentPath = parts.join('/') || '/';
         const parentDir = this._resolvePath(parentPath);
         if (parentDir instanceof VDirectory && !parentDir.children[dirname]) {
             parentDir.children[dirname] = new VDirectory(dirname);
@@ -144,223 +93,140 @@ class VOS {
         }
         return false;
     }
-
-    listFiles(path = '.') {
-        const directory = this._resolvePath(path);
-        if (directory instanceof VDirectory) {
-            return Object.keys(directory.children).map(key => {
-                const child = directory.children[key];
-                if (child instanceof VDirectory) return `${key}/`;
-                if (child.type === 'exe') return `${key}*`;
-                return key;
-            });
-        }
-        return [];
-    }
-
-    changeDir(path) {
-        const newDir = this._resolvePath(path);
-        if (newDir instanceof VDirectory) {
-            this.cwd = newDir;
-            return true;
-        }
-        return false;
-    }
 }
 
-// --- BootCheck ---
-class BootCheck {
-    constructor(name, check, description) {
-        if (typeof name !== 'string' || name.trim() === '') {
-            throw new Error('BootCheck name must be a non-empty string.');
-        }
-        if (typeof check !== 'function') {
-            throw new Error('BootCheck check must be a function that returns a Promise.');
-        }
-        this.name = name;
-        this.check = check;
-        this.description = description || '';
-    }
-}
-class BootCheckRegistry {
-    constructor() { this.checks = []; }
-    addCheck(bootCheck) { this.checks.push(bootCheck); }
-    async runChecks(terminal) {
-        let allOk = true;
-        for (const check of this.checks) {
-            terminal.biosOutput.innerHTML += `<p>Running: ${check.name}... </p>`;
-            const result = await terminal.bootCheck(check.check);
-            terminal.biosOutput.innerHTML += `<span class=\"status-${result.status}\">${result.message}</span>`;
-            if (result.status === 'failed') allOk = false;
-        }
-        return allOk;
-    }
-}
-
-// --- Main Terminal Class ---
-class CentralTerminal {
-  constructor(containerSelector) {
-    this.container = document.querySelector(containerSelector);
-    this.output = this.container.querySelector('#terminalOutput') || document.getElementById('terminalOutput');
-    this.input = this.container.querySelector('#terminal-command-input') || document.getElementById('terminal-command-input');
-    this.biosOutput = document.getElementById('bios-output');
-    this.commands = {};
-    this.bootChecks = [];
-    this.bootCheckRegistry = new BootCheckRegistry();
-    this.addons = {};
-    this.activeAddon = null;
-    // Match test expectations: start in /user
-    this.cwd = '/user';
-    this.fs = { '/user': {} };
-    this.initDefaultCommands();
-  }
-
-  initDefaultCommands() {
-    this.addCommand(new Command('pwd', 'Print working directory', (args) => this.print(this.cwd)));
-    this.addCommand(new Command('ls', 'List files', (args) => {
-      const files = Object.keys(this.fs[this.cwd] || {});
-      this.print(files.length ? files.join('\n') : '');
-    }));
-    this.addCommand(new Command('cd', 'Change directory', (args) => {
-      const path = args[0];
-      if (path && this.fs[path]) {
-        this.cwd = path;
-      } else if (path && path.startsWith('/')) {
-        this.fs[path] = this.fs[path] || {};
-        this.cwd = path;
-      } else {
-        this.print('Directory not found.');
-        return;
-      }
-    }));
-    this.addCommand(new Command('cat', 'Show file contents', (args) => {
-      const file = args[0];
-      if (file && this.fs[this.cwd][file] !== undefined) {
-        this.print(this.fs[this.cwd][file]);
-      } else {
-        this.print('File not found.');
-      }
-    }));
-    this.addCommand(new Command('touch', 'Create file', (args) => {
-      const file = args[0];
-      if (file) {
-        this.fs[this.cwd][file] = '';
-      }
-    }));
-    this.addCommand(new Command('help', 'Show help', (args) => {
-      this.print(Object.keys(this.commands).join(', '));
-    }));
-    this.addCommand(new Command('run', 'Run addon', (args) => {
-      const addonName = args[0];
-      if (addonName && this.addons[addonName]) {
-        this.activeAddon = this.addons[addonName];
-        this.activeAddon.onStart(this);
-      } else {
-        this.print('Addon not found.');
-      }
-    }));
-    this.addCommand(new Command('exit', 'Exit addon', (args) => {
-      if (this.activeAddon) {
-        this.activeAddon.onStop();
-        this.activeAddon = null;
-        this.print('Returned to main terminal.');
-      }
-    }));
-  }
-
-  addCommand(cmd) {
-    // Support both Command(action) and Command({action})
-    if (typeof cmd.action !== 'function' && cmd.execute && typeof cmd.execute === 'function') {
-      cmd.action = cmd.execute;
-    }
-    this.commands[cmd.name] = cmd;
-  }
-
-  print(text) {
-    if (this.output) {
-      this.output.textContent += (text + '\n');
-    }
-  }
-
-  clear() {
-    if (this.output) {
-      this.output.textContent = '';
-    }
-  }
-
-  runCommand(input) {
-    if (this.activeAddon) {
-      if (input === 'exit') {
-        this.activeAddon.onStop();
-        this.activeAddon = null;
-        this.print('Returned to main terminal.');
-        return;
-      }
-      this.activeAddon.onCommand(input);
-      return;
-    }
-    const [cmd, ...args] = input.split(' ');
-    if (this.commands[cmd]) {
-      this.commands[cmd].action(args);
-    } else {
-      this.print(`Command not recognized: ${cmd}.`);
-    }
-  }
-
-  addBootCheck(check) {
-    this.bootChecks.push(check);
-  }
-
-    async bootCheck(checkFunction) {
-        try {
-            const result = await checkFunction();
-            return { status: result ? 'ok' : 'failed', message: result ? 'OK' : 'FAIL' };
-        } catch (error) {
-            return { status: 'failed', message: `FAIL: ${error.message}` };
-        }
-    }
-
-  async boot() {
-    if (this.biosOutput) this.biosOutput.innerHTML = 'Booting...<br>';
-    for (const check of this.bootChecks) {
-        const result = await this.bootCheck(check.check);
-        if (this.biosOutput) this.biosOutput.innerHTML += `${check.name}: ${result.message}<br>`;
-    }
-    if (this.biosOutput) this.biosOutput.innerHTML += 'Booting complete.<br>';
-  }
-
-  registerAddon(addon) {
-    this.addons[addon.name] = addon;
-  }
-}
-
-// --- Command Class (single, exported) ---
-class Command {
-    constructor(name, description, execute, aliases = []) {
+export class Command {
+    constructor(name, description, execute) {
         this.name = name;
         this.description = description;
         this.execute = execute;
-        this.aliases = aliases;
-        // Fix: support both function and { action: fn } object
-        if (typeof execute === 'function') {
-            this.action = execute;
-        } else if (execute && typeof execute.action === 'function') {
-            this.action = execute.action;
-        } else {
-            this.action = () => {};
-        }
     }
 }
 
-// Export all class for developers
-module.exports = {
-    CentralTerminal,
-    Command,
-    Addon,
-    AddonExecutor,
-    VFile,
-    VDirectory,
-    VOS,
-    BootCheck,
-    BootCheckRegistry
-};
+export class CentralTerminal {
+    constructor(containerSelector) {
+        const container = document.querySelector(containerSelector);
+        if (!container) throw new Error(`Container element not found: ${containerSelector}`);
+
+        this.output = container.querySelector('#terminalOutput');
+        this.input = container.querySelector('#terminal-command-input');
+        this.biosOutput = document.getElementById('bios-output'); // Assumes global ID
+
+        this.commands = {};
+        this.history = [];
+        this.vfs = new VOS();
+
+        this.initDefaultCommands();
+
+        this.input.addEventListener('keydown', (e) => this.handleInput(e));
+    }
+
+    handleInput(e) {
+        if (e.key === 'Enter') {
+            const value = this.input.value.trim();
+            if (value) {
+                this.print(`S> ${value}`);
+                this.history.push(value);
+                this.runCommand(value);
+            }
+            this.input.value = '';
+            this.output.scrollTop = this.output.scrollHeight;
+        }
+    }
+
+    initDefaultCommands() {
+        this.addCommand(new Command('help', 'Show available commands', () => {
+            const commandList = Object.keys(this.commands).join(', ');
+            this.print(commandList);
+        }));
+
+        this.addCommand(new Command('clear', 'Clear the terminal screen', () => {
+            this.output.innerHTML = '';
+        }));
+
+        this.addCommand(new Command('history', 'Show command history', () => {
+            this.history.forEach((cmd, i) => this.print(`${i}: ${cmd}`));
+        }));
+        
+        this.addCommand(new Command('echo', 'Display a line of text', (args) => {
+            this.print(args.join(' '));
+        }));
+        
+        this.addCommand(new Command('pwd', 'Print name of current/working directory', () => {
+            this.print(this.vfs.getFullPath(this.vfs.cwd));
+        }));
+
+        this.addCommand(new Command('ls', 'List directory contents', (args) => {
+            const path = args[0] || '.';
+            const node = this.vfs._resolvePath(path);
+            if (node instanceof VDirectory) {
+                const content = Object.keys(node.children).map(name => {
+                    return node.children[name] instanceof VDirectory ? `${name}/` : name;
+                }).join('\n') || '';
+                this.print(content);
+            } else {
+                this.print(`ls: cannot access '${path}': No such file or directory`);
+            }
+        }));
+
+        this.addCommand(new Command('cd', 'Change the working directory', (args) => {
+            const path = args[0] || '/';
+            const newDir = this.vfs._resolvePath(path);
+            if (newDir instanceof VDirectory) {
+                this.vfs.cwd = newDir;
+            } else {
+                this.print(`cd: no such file or directory: ${path}`);
+            }
+        }));
+
+        this.addCommand(new Command('mkdir', 'Make directories', (args) => {
+            if (!args[0]) return this.print('mkdir: missing operand');
+            this.vfs.createDirectory(`${this.vfs.getFullPath(this.vfs.cwd)}/${args[0]}`);
+        }));
+
+        this.addCommand(new Command('touch', 'Create a new empty file', (args) => {
+            if (!args[0]) return this.print('touch: missing operand');
+            this.vfs.createFile(`${this.vfs.getFullPath(this.vfs.cwd)}/${args[0]}`);
+        }));
+
+        this.addCommand(new Command('cat', 'Concatenate and print files', (args) => {
+            const path = args[0];
+            if (!path) return;
+            const file = this.vfs._resolvePath(path);
+            if (file instanceof VFile) {
+                this.print(file.content);
+            } else {
+                this.print(`cat: ${path}: No such file or directory`);
+            }
+        }));
+    }
+
+    addCommand(command) {
+        this.commands[command.name] = command;
+    }
+
+    print(htmlContent) {
+        this.output.innerHTML += `${htmlContent}<br>`;
+        this.output.scrollTop = this.output.scrollHeight;
+    }
+
+    runCommand(line) {
+        const [name, ...args] = line.trim().split(/\s+/);
+        if (this.commands[name]) {
+            this.commands[name].execute(args);
+        } else {
+            this.print(`Command not found: ${name}`);
+        }
+    }
+
+    boot() {
+        this.biosOutput.innerHTML = 'Booting...<br>';
+        // Simulate boot checks
+        setTimeout(() => {
+            this.biosOutput.innerHTML += 'System Integrity Check: OK<br>';
+            this.biosOutput.innerHTML += 'Booting complete.<br>';
+            this.print('Welcome to the CWP Terminal Emulator!');
+            this.print("Type 'help' to see a list of available commands.<br>");
+        }, 500);
+    }
+}
