@@ -380,10 +380,6 @@ export class CentralTerminal {
         }));
         this.addCommand(new Command("date", "Displays the current date and time.", () => this.print(new Date().toLocaleString()), ["time"]));
         this.addCommand(new Command("clear", "Clear terminal output", () => this.clear()));
-        this.addCommand(new Command("help", "List available commands", () => {
-            const helpText = [...new Set(Object.values(this.commands))].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(15)}- ${c.description}`).join('\n');
-            this.printHtml(`<pre>${helpText}</pre>`);
-        }));
         this.addCommand(new Command("run", "Run a registered addon", (args) => {
             if (!args[0]) { this.print("Usage: run <addon-name> [args]"); return; }
             this.addonExecutor.startAddon(args[0], this, this.vOS, ...args.slice(1));
@@ -463,6 +459,10 @@ export class CentralTerminal {
             this.print('3     user     20   0  2.2g   512m  256m   S   3.1  0.4   0:12.45  gnome-shell');
             this.print('4     user     20   0  8.3g   256m  128m   S   1.5  0.2   0:05.18  node');
             this.print('...');
+        }));
+        this.addCommand(new Command("help", "List available commands", () => {
+            const helpText = [...new Set(Object.values(this.commands))].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(15)}- ${c.description}`).join('\n');
+            this.printHtml(`<pre>${helpText}</pre>`);
         }));
     }
 
