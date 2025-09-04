@@ -2,24 +2,18 @@
 name: Nightly Release
 
 on:
-  workflow_dispatch: # Allow manual triggering
   schedule:
-    # Runs at 03:00 UTC on the 1st and 15th of every month
-    - cron: '0 3 1,15 * *'
+    - cron: '0 0 * * *' # Runs every day at midnight UTC
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   publish-nightly:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to allow version bump and commit
       id-token: write # for npm provenance
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          # We need to fetch all history and branches for versioning
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for commit access
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,26 +21,12 @@ jobs:
           node-version: 18
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Create nightly version and tag
+      - name: Create and publish nightly version
         run: |
-          npm version prerelease --preid nightly --git-tag-version=false
-          git add package.json package-lock.json
-
-      - name: Commit and push version bump
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          git commit -m "chore(release): nightly release $VERSION"
-          git push
-
-      - name: Publish to npm
-        run: npm publish --tag nightly --provenance --access public
+          npm version prerelease --preid nightly --no-git-tag-version
+          npm publish --tag nightly --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

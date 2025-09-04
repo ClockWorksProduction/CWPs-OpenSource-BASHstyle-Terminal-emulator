@@ -1,7 +1,5 @@
-
-# GitHub Action for automatic dev release publishing to npm
-
-name: Publish Dev Release
+# .github/workflows/dev-release.yml
+name: Development Release
 
 on:
   push:
@@ -12,29 +10,23 @@ on:
 
 jobs:
   publish-dev:
-    # Use the latest version of Ubuntu for the runner environment
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write # for npm provenance
     steps:
-      # Step 1: Check out the repository's code so the workflow can access it.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up the Node.js environment.
-      # Specifies Node.js version 18 and the npm registry URL.
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
           registry-url: 'https://registry.npmjs.org'
 
-      # Step 3: Install project dependencies using 'npm ci'.
-      # 'npm ci' is recommended for CI environments as it provides faster, more reliable builds.
       - name: Install dependencies
         run: npm ci
 
-      # Step 4: Create a unique dev version and publish to npm.
-      - name: Create dev version and publish
+      - name: Create and publish dev version
         run: |
           # Get the latest published version from npm (e.g., 4.0.7).
           LATEST_VERSION=$(npm view . version)

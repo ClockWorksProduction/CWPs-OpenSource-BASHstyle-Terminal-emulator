@@ -48,11 +48,10 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: sync package-lock.json"
 
       - name: Bump version and create Git tag
-        run: |
-          npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %%s"
+        run: npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %s"
 
       - name: Push changes and tags
-        run: git push --follow-tags
+        run: git push origin ${{ github.ref_name }} --follow-tags
 
       - name: Publish to npm
         run: npm publish --tag latest --provenance --access public
