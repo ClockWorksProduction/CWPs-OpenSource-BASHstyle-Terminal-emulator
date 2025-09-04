@@ -39,7 +39,8 @@ jobs:
         run: npm ci
 
       - name: Bump patch version and create Git tag
-        run: npm version patch -m "chore(release): lts release %%s"
+        run: |
+          npm version patch -m "chore(release): lts release %%s"
 
       - name: Push changes and tags
         run: git push --follow-tags
