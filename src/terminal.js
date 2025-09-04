@@ -1,7 +1,7 @@
 
 // ==========================
 // CWP_OpenTerminalEmmulator_CORE.js
-// v4.1.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
+// v5.0.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
 // ==========================
 
 // --- VFile and VDirectory Classes ---
@@ -174,6 +174,18 @@ Enjoy exploring!
         return false;
     }
 
+    deleteDirectory(path) {
+        const dir = this._resolvePath(path);
+        if (dir instanceof VDirectory && Object.keys(dir.children).length === 0) {
+            const parent = this._getParent(dir);
+            if (parent) {
+                delete parent.children[dir.name];
+                return true;
+            }
+        }
+        return false;
+    }
+
     listFiles(path = '.') {
         const directory = this._resolvePath(path);
         if (directory instanceof VDirectory) {
@@ -271,7 +283,7 @@ export class CentralTerminal {
 
     async boot() {
         this.biosOutput.innerHTML = '';
-        this.biosOutput.innerHTML += `<p>Central BIOS v1.0.0</p><p>Copyright (C) 2024, Central Corp.</p><p>&nbsp;</p>`;
+        this.biosOutput.innerHTML += `<p>CWP Open Terminal Emulator</p><p>Copyright (C) 2025 ClockWorks Production</p><p>&nbsp;</p>`;
         const allOk = await this.bootCheckRegistry.runChecks(this);
         this.biosOutput.innerHTML += `<p>&nbsp;</p>`;
         if (allOk) {
@@ -351,6 +363,9 @@ export class CentralTerminal {
         this.addCommand(new Command("mkdir", "Create a directory", (args) => {
             if (!args[0] || !this.vOS.createDirectory(args[0])) this.print(`mkdir: cannot create directory: ${args[0] || ''}`);
         }));
+        this.addCommand(new Command("rmdir", "Remove an empty directory", (args) => {
+            if (!args[0] || !this.vOS.deleteDirectory(args[0])) this.print(`rmdir: failed to remove '${args[0]}': No such file or directory, or directory not empty`);
+        }));
         this.addCommand(new Command("touch", "Create an empty file", (args) => {
              if (!args[0]) { this.print("Usage: touch <filename>"); return; }
              if (!this.vOS.createFile(args[0])) this.print(`touch: cannot create file: ${args[0]}`);
@@ -374,25 +389,10 @@ export class CentralTerminal {
             this.addonExecutor.startAddon(args[0], this, this.vOS, ...args.slice(1));
         }));
         this.addCommand(new Command("exit", "Exits the current addon.", () => {
-            if (!this.addonExecutor.activeAddon) { this.print("No active addon to exit."); return; }
-            this.addonExecutor.stopAddon(this);
-        }));
-        this.addCommand(new Command('tpkg', 'Simulated third-party package manager. Usage: tpkg [install|remove|list] <name>', async (args) => {
-            const [subCommand, pkgName] = args;
-            this._ensureAddonDir();
-            switch (subCommand) {
-                case 'install':
-                    await this._installPackage(pkgName);
-                    break;
-                case 'remove':
-                    this._removePackage(pkgName);
-                    break;
-                case 'list':
-                    this._listPackages();
-                    break;
-                default:
-                    this.print('Usage: tpkg [install|remove|list] <package_name>');
-                    break;
+            if(this.rps.isActive) {
+                this._stopRps();
+            } else if (this.editor.isActive) {
+                this._stopEditor();
             }
         }));
         this.addCommand(new Command('ping', 'Check network connectivity to a host.', async (args) => {
@@ -446,6 +446,36 @@ export class CentralTerminal {
         this.addCommand(new Command('rps', 'Play Rock, Paper, Scissors.', () => {
             this._startRps();
         }));
+        this.addCommand(new Command('tree', 'Display the file system tree.', (args) => {
+            const path = args[0] || '.';
+            const dir = this.vOS._resolvePath(path);
+            if (dir instanceof VDirectory) {
+                this.print(path);
+                this._printTree(dir);
+            } else {
+                this.print(`tree: '${path}': No such directory`);
+            }
+        }));
+        this.addCommand(new Command('top', 'Display system processes (simulated).', () => {
+            this.print('PID   USER     PR  NI  VIRT   RES   SHR   S  %CPU %MEM     TIME+  COMMAND');
+            this.print('1     root     20   0  12.1g  1.2g  1.1g   R  12.5  0.8   1:05.35  systemd');
+            this.print('2     user     20   0  1.4g   1.1g  1.0g   S   6.2  0.7   0:33.12  Xorg');
+            this.print('3     user     20   0  2.2g   512m  256m   S   3.1  0.4   0:12.45  gnome-shell');
+            this.print('4     user     20   0  8.3g   256m  128m   S   1.5  0.2   0:05.18  node');
+            this.print('...');
+        }));
+    }
+
+    _printTree(directory, prefix = '') {
+        const children = Object.values(directory.children);
+        children.forEach((child, index) => {
+            const isLast = index === children.length - 1;
+            const newPrefix = prefix + (isLast ? '    ' : '│   ');
+            this.print(prefix + (isLast ? '└── ' : '├── ') + child.name);
+            if (child instanceof VDirectory) {
+                this._printTree(child, newPrefix);
+            }
+        });
     }
 
     _startEditor(path) {
@@ -689,7 +719,7 @@ export class CentralTerminal {
         const command = this.commands[cmdName];
 
         if (command) {
-            command.execute(args, this); // Pass terminal instance to commands
+            command.execute(args, this);
         } else {
             this.print(`Command not recognized: ${cmdName}.`);
         }
@@ -697,5 +727,4 @@ export class CentralTerminal {
 
 }
 
-// Export Addon class for developers
-export { Addon, Command };
+export { Command };
