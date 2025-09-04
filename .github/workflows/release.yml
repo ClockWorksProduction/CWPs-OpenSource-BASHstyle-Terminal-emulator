@@ -1,66 +1,54 @@
-# GitHub Action for manually triggering a stable release
-
-name: Release Stable Version
+# .github/workflows/release.yml
+name: Stable Release
 
 on:
-  # This allows you to run this workflow manually from the Actions tab in GitHub.
   workflow_dispatch:
     inputs:
-      # Define the input for the version bump type.
-      version_type:
-        description: "The type of version bump (patch, minor, or major)"
-        required: true
-        default: "patch"
+      version-bump:
         type: choice
+        description: 'What type of version bump?'
+        required: true
+        default: 'patch'
         options:
           - patch
           - minor
           - major
 
 jobs:
-  publish-stable:
+  publish-release:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write # to allow version bump and tagging
+      id-token: write # for npm provenance
     steps:
-      # Step 1: Check out the repository's code.
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # We need to fetch all history for versioning and fetch the token for pushing.
+          # We need to fetch all history and branches for versioning
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for commit and tag access
 
-      # Step 2: Set up the Node.js environment.
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
           registry-url: 'https://registry.npmjs.org'
 
-      # Step 3: Configure Git user details.
-      # This is necessary for the action to be able to push the version commit.
-      - name: Configure Git User
+      - name: Configure Git
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Step 4: Install dependencies.
       - name: Install dependencies
         run: npm ci
 
-      # Step 5: Bump the version, create a commit, and tag it.
-      # The GITHUB_TOKEN is automatically available to the workflow.
-      - name: Bump version and create tag
-        run: npm version ${{ github.event.inputs.version_type }} -m "chore(release): %s"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump version and create Git tag
+        run: npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %s"
 
-      # Step 6: Push the new commit and tag to the repository.
-      - name: Push changes to repository
+      - name: Push changes and tags
         run: git push --follow-tags
 
-      # Step 7: Publish the package to npm with the 'latest' tag.
       - name: Publish to npm
-        run: npm publish --tag latest
+        run: npm publish --tag latest --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
