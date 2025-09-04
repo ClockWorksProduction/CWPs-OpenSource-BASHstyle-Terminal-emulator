@@ -1,11 +1,10 @@
-import { CentralTerminal, Command, Addon } from '../src/terminal.js';
+import { CentralTerminal, Addon } from '../src/terminal.js';
 
-describe('CentralTerminal v4.1.0', () => {
+describe('CentralTerminal v5.0.0 (full coverage)', () => {
     let term;
     let container;
 
     beforeEach(() => {
-        // Set up a container for the terminal before each test
         document.body.innerHTML = `
             <div id="test-container">
                 <div id="terminalOutput"></div>
@@ -17,55 +16,118 @@ describe('CentralTerminal v4.1.0', () => {
         `;
         container = document.getElementById('test-container');
         term = new CentralTerminal('#test-container');
-        term.boot(); // Boot the terminal to initialize it
+        term.boot();
     });
 
     afterEach(() => {
-        // Clean up the DOM
         document.body.innerHTML = '';
         term = null;
         container = null;
     });
 
     it("should initialize with core commands", () => {
-        const coreCommands = ['help', 'echo', 'clear', 'ls', 'cat', 'cd', 'pwd', 'touch', 'run', 'exit'];
+        const coreCommands = [
+            'help', 'echo', 'clear', 'ls', 'cat', 'cd', 'pwd',
+            'touch', 'run', 'exit', 'history', 'whoami', 'edit'
+        ];
         coreCommands.forEach(cmd => {
-            expect(term.commands[cmd]).toBeDefined();
+            expect(term.commands.get(cmd)).toBeDefined();
         });
     });
 
-    it("should print output to the terminal", () => {
-        term.print('Hello, Tester!');
-        expect(container.textContent).toContain('Hello, Tester!');
+    it("should display help output", async () => {
+        await term.runCommand('help');
+        expect(container.textContent).toContain('Available commands:');
+        expect(container.textContent).toContain('echo');
+    });
+
+    it("should print and echo text", async () => {
+        await term.runCommand('echo HelloWorld');
+        expect(container.textContent).toContain('HelloWorld');
     });
 
     it("should clear the terminal output", () => {
-        term.print('Some initial text');
+        term.print('Some text');
         term.clear();
         expect(container.querySelector('#terminalOutput').textContent).toBe('');
     });
 
-    it("should execute the 'pwd' command", async () => {
+    it("should show the current working directory with pwd", async () => {
         await term.runCommand('pwd');
-        expect(container.textContent).toContain('/C/Users/user');
+        expect(container.textContent).toContain('/home/user');
     });
 
-    it("should create a file with 'touch' and list it with 'ls'", async () => {
-        await term.runCommand('touch my-test-file.txt');
+    it("should change directories with cd", async () => {
+        await term.runCommand('mkdir projects'); // assuming mkdir exists
+        await term.runCommand('cd projects');
+        await term.runCommand('pwd');
+        expect(container.textContent).toContain('/home/user/projects');
+    });
+
+    it("should create and list files with touch and ls", async () => {
+        await term.runCommand('touch alpha.txt');
         await term.runCommand('ls');
-        expect(container.textContent).toContain('my-test-file.txt');
+        expect(container.textContent).toContain('alpha.txt');
+    });
+
+    it("should read file content with cat", async () => {
+        await term.runCommand('touch notes.txt');
+        term.vfs['/home/user/notes.txt'].content = 'Test content';
+        await term.runCommand('cat notes.txt');
+        expect(container.textContent).toContain('Test content');
     });
 
     it("should handle unknown commands gracefully", async () => {
-        await term.runCommand('nonexistent-command');
-        expect(container.textContent).toContain('Command not recognized: nonexistent-command');
+        await term.runCommand('foobar');
+        expect(container.textContent).toContain('bash: foobar: command not found');
+    });
+
+    it("should record command history", async () => {
+        await term.runCommand('echo one');
+        await term.runCommand('echo two');
+        await term.runCommand('history');
+        expect(container.textContent).toContain('echo one');
+        expect(container.textContent).toContain('echo two');
+    });
+
+    it("should report the current user with whoami", async () => {
+        await term.runCommand('whoami');
+        expect(container.textContent).toContain('user');
+    });
+
+    it("should open the editor with edit, write and quit", async () => {
+        await term.runCommand('edit file.txt');
+        expect(container.textContent).toContain('Opened editor for file.txt');
+
+        // Simulate write
+        term.editorBuffer = 'Hello Editor';
+        await term.runCommand(':w');
+        expect(term.vfs['/home/user/file.txt'].content).toBe('Hello Editor');
+
+        // Quit without saving
+        await term.runCommand(':q');
+        expect(container.textContent).toContain('Exited editor for file.txt');
+    });
+
+    it("should exit the editor with :wq (save and quit)", async () => {
+        await term.runCommand('edit testdoc.txt');
+        term.editorBuffer = 'Save and quit';
+        await term.runCommand(':wq');
+        expect(term.vfs['/home/user/testdoc.txt'].content).toBe('Save and quit');
+        expect(container.textContent).toContain('Exited editor for testdoc.txt');
     });
 
     it("should register and execute a custom command", async () => {
-        const customCommand = new Command('greet', 'Greets a user', (args) => term.print(`Greetings, ${args[0] || 'stranger'}!`));
-        term.addCommand(customCommand);
-        await term.runCommand('greet Jupiter');
-        expect(container.textContent).toContain('Greetings, Jupiter!');
+        term.addCommand({
+            name: 'greet',
+            description: 'Greets a user',
+            action: (args, termInstance) => {
+                termInstance.print(`Greetings, ${args[0] || 'stranger'}!`);
+            }
+        });
+
+        await term.runCommand('greet Tester');
+        expect(container.textContent).toContain('Greetings, Tester!');
     });
 
     it("should register and run a simple addon", async () => {
@@ -76,18 +138,20 @@ describe('CentralTerminal v4.1.0', () => {
         class SimpleAddon extends Addon {
             constructor() {
                 super('simple');
+                this.term = null;
             }
-            onStart(term) {
+            onStart(termInstance) {
                 onStartCalled = true;
-                term.print('SimpleAddon started');
+                this.term = termInstance;
+                this.term.print('SimpleAddon started');
             }
-            onCommand(input, term) {
+            onCommand(input) {
                 onCommandCalled = true;
-                term.print(`Addon got: ${input}`);
+                this.term.print(`Addon got: ${input}`);
             }
-            onStop(term) {
+            onStop() {
                 onStopCalled = true;
-                term.print('SimpleAddon stopped');
+                this.term.print('SimpleAddon stopped');
             }
         }
 
@@ -96,15 +160,20 @@ describe('CentralTerminal v4.1.0', () => {
         expect(onStartCalled).toBe(true);
         expect(container.textContent).toContain('SimpleAddon started');
 
-        // Commands are now handled by the addon
-        await term.runCommand('test-input');
+        await term.runCommand('addon-test');
         expect(onCommandCalled).toBe(true);
-        expect(container.textContent).toContain('Addon got: test-input');
+        expect(container.textContent).toContain('Addon got: addon-test');
 
-        // Exit the addon
         await term.runCommand('exit');
         expect(onStopCalled).toBe(true);
         expect(container.textContent).toContain('SimpleAddon stopped');
         expect(term.addonExecutor.activeAddon).toBeNull();
+    });
+
+    it("should handle Ctrl+C simulation", () => {
+        const beforeLen = term.history.length;
+        term.handleInterrupt(); // simulate Ctrl+C
+        expect(term.history.length).toBe(beforeLen + 1);
+        expect(container.textContent).toContain('^C');
     });
 });

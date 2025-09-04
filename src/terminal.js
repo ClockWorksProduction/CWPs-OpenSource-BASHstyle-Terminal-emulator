@@ -1,730 +1,683 @@
-
 // ==========================
-// CWP_OpenTerminalEmmulator_CORE.js
-// v5.0.0 - A Modular, BASH-style Terminal Emulator Library for the Web.
+// CentralTerminal v5.0.0 — Client-only, BASH-like web terminal emulator
+// - POSIX pathing throughout
+// - Better realism: timestamps, overwrite flags, unixy errors
+// - Interactivity: autocomplete, history nav, Ctrl+C, prompt
+// - Persistence: localStorage for VFS + history + cwd
+// - Safe: client-side only; simulated network
 // ==========================
 
-// --- VFile and VDirectory Classes ---
+// ---------- Utility ----------
+const nowISO = () => new Date().toISOString();
+const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+
+// ---------- Virtual FS ----------
 class VFile {
-    constructor(name, content = '', type = 'text') {
-        this.name = name;
-        this.content = content;
-        this.type = type;
-    }
+  constructor(name, content = '', ftype = 'text', mode = 0o644) {
+    this.kind = 'file';
+    this.name = name;
+    this.content = content;
+    this.ftype = ftype; // text | image | audio | exe
+    this.mode = mode;   // unix-like permissions (not enforced, informational)
+    this.ctime = nowISO();
+    this.mtime = this.ctime;
+  }
 }
 
 class VDirectory {
-    constructor(name) {
-        this.name = name;
-        this.children = {};
-    }
-    getChild(name) { return this.children[name]; }
+  constructor(name) {
+    this.kind = 'dir';
+    this.name = name;
+    this.children = {}; // name -> VFile | VDirectory
+  }
+  getChild(name) { return this.children[name]; }
 }
 
-// --- Command Class ---
-class Command {
-    constructor(name, description, execute, aliases = []) {
-        this.name = name;
-        this.description = description;
-        this.execute = execute;
-        this.aliases = aliases;
+class VOS {
+  constructor() {
+    this.root = new VDirectory(''); // represents '/'
+    this.homePath = '/home/user';
+    this.cwd = this._mkdirp(this.homePath);
+    this._seed();
+  }
+
+  // --- serialization ---
+  toJSON() {
+    const encode = (node) => {
+      if (node.kind === 'dir') {
+        const out = { kind: 'dir', name: node.name, children: {} };
+        for (const [k, v] of Object.entries(node.children)) out.children[k] = encode(v);
+        return out;
+      }
+      return deepClone({
+        kind: 'file', name: node.name, content: node.content, ftype: node.ftype,
+        mode: node.mode, ctime: node.ctime, mtime: node.mtime,
+      });
+    };
+    return { root: encode(this.root), cwd: this.pathOf(this.cwd), homePath: this.homePath };
+  }
+
+  static fromJSON(json) {
+    const decode = (obj) => {
+      if (obj.kind === 'dir') {
+        const d = new VDirectory(obj.name);
+        for (const [k, v] of Object.entries(obj.children || {})) d.children[k] = decode(v);
+        return d;
+      }
+      const f = new VFile(obj.name, obj.content, obj.ftype, obj.mode);
+      f.ctime = obj.ctime; f.mtime = obj.mtime; return f;
+    };
+    const vos = new VOS();
+    vos.root = decode(json.root);
+    vos.cwd = vos.resolve(json.cwd) || vos._mkdirp('/home/user');
+    vos.homePath = json.homePath || '/home/user';
+    return vos;
+  }
+
+  // --- helpers ---
+  _seed() {
+    this.mkdir('/home');
+    this.mkdir('/home/user');
+    this.mkdir('/bin');
+    this.mkdir('/etc');
+    this.mkdir('/docs');
+    this.mkdir('/media');
+    this.mkdir('/media/images');
+    this.mkdir('/media/audio');
+    this.writeFile('/etc/motd', 'Welcome to the Central Terminal!\n\nHave a great day!');
+    const demo = `# Welcome to the Virtual File System!\n\nUse commands: ls, cd, cat, tree.\nEnjoy!\n`;
+    this.writeFile('/docs/guide.txt', demo);
+  }
+
+  // Normalize path, POSIX-like. Supports '.', '..', absolute and relative.
+  normalize(path) {
+    if (!path || path === '') return this.pathOf(this.cwd);
+    if (path.startsWith('~')) path = path.replace('~', this.homePath);
+    const abs = path.startsWith('/') ? path : this.pathOf(this.cwd) + '/' + path;
+    const parts = abs.split('/');
+    const stack = [];
+    for (const part of parts) {
+      if (!part || part === '.') continue;
+      if (part === '..') stack.pop(); else stack.push(part);
     }
+    return '/' + stack.join('/');
+  }
+
+  resolve(path) {
+    const norm = this.normalize(path);
+    if (norm === '/') return this.root;
+    const segs = norm.split('/').filter(Boolean);
+    let cur = this.root;
+    for (const s of segs) {
+      if (!(cur instanceof VDirectory)) return null;
+      cur = cur.children[s];
+      if (!cur) return null;
+    }
+    return cur;
+  }
+
+  parentOf(path) {
+    const norm = this.normalize(path);
+    if (norm === '/') return null;
+    const up = norm.slice(0, norm.lastIndexOf('/')) || '/';
+    return this.resolve(up);
+  }
+
+  pathOf(node) {
+    // BFS up from root
+    const path = [];
+    const dfs = (cur, target, acc) => {
+      if (cur === target) { path.push(...acc); return true; }
+      if (cur.kind !== 'dir') return false;
+      for (const [name, child] of Object.entries(cur.children)) {
+        if (dfs(child, target, [...acc, name])) return true;
+      }
+      return false;
+    };
+    if (node === this.root) return '/';
+    dfs(this.root, node, []);
+    return '/' + path.join('/');
+  }
+
+  // --- FS ops ---
+  _mkdirp(path) {
+    const norm = this.normalize(path);
+    if (norm === '/') return this.root;
+    const segs = norm.split('/').filter(Boolean);
+    let cur = this.root;
+    for (const s of segs) {
+      if (!cur.children[s]) cur.children[s] = new VDirectory(s);
+      cur = cur.children[s];
+      if (!(cur instanceof VDirectory)) throw new Error('ENOTDIR: not a directory, ' + s);
+    }
+    return cur;
+  }
+
+  mkdir(path) {
+    const parent = this.parentOf(path);
+    if (!(parent instanceof VDirectory)) return false;
+    const name = this.normalize(path).split('/').filter(Boolean).pop();
+    if (parent.children[name]) return false; // EEXIST
+    parent.children[name] = new VDirectory(name);
+    return true;
+  }
+
+  rmdir(path) {
+    const dir = this.resolve(path);
+    if (!(dir instanceof VDirectory)) return false;
+    if (Object.keys(dir.children).length) return false; // ENOTEMPTY
+    const parent = this.parentOf(path);
+    if (!parent) return false;
+    delete parent.children[dir.name];
+    return true;
+  }
+
+  writeFile(path, content = '', ftype = 'text', overwrite = true) {
+    const parent = this.parentOf(path);
+    if (!(parent instanceof VDirectory)) return false;
+    const name = this.normalize(path).split('/').filter(Boolean).pop();
+    const exists = parent.children[name];
+    if (exists) {
+      if (!(exists instanceof VFile)) return false; // EISDIR
+      if (!overwrite) return false; // EEXIST
+      exists.content = content;
+      exists.mtime = nowISO();
+      exists.ftype = ftype;
+      return true;
+    }
+    parent.children[name] = new VFile(name, content, ftype);
+    return true;
+  }
+
+  readFile(path) {
+    const node = this.resolve(path);
+    if (node instanceof VFile) return node.content;
+    return null;
+  }
+
+  unlink(path) {
+    const parent = this.parentOf(path);
+    const node = this.resolve(path);
+    if (!(parent instanceof VDirectory) || !(node instanceof VFile)) return false;
+    delete parent.children[node.name];
+    return true;
+  }
+
+  ls(path = '.') {
+    const dir = this.resolve(path);
+    if (!(dir instanceof VDirectory)) return null;
+    return Object.values(dir.children).map((child) => {
+      if (child.kind === 'dir') return child.name + '/';
+      if (child.ftype === 'exe') return child.name + '*';
+      return child.name;
+    }).sort();
+  }
+
+  chdir(path) {
+    const dir = this.resolve(path);
+    if (dir instanceof VDirectory) { this.cwd = dir; return true; }
+    return false;
+  }
 }
 
-// --- Addon Handling ---
+// ---------- Boot Checks ----------
+class BootCheck { constructor(name, fn, description = '') { this.name = name; this.fn = fn; this.description = description; } }
+class BootCheckRegistry {
+  constructor() { this.checks = []; }
+  add(check) { this.checks.push(check); }
+  async run(term) {
+    let ok = true;
+    for (const c of this.checks) {
+      term._biosWrite(`Running: ${c.name}... `);
+      try {
+        const passed = await c.fn();
+        term._biosWriteLine(passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>');
+        if (!passed) ok = false;
+      } catch {
+        term._biosWriteLine('<span class="status-failed">FAILED</span>'); ok = false;
+      }
+    }
+    return ok;
+  }
+}
+
+// ---------- Addons ----------
 class Addon {
-    constructor(name) { this.name=name; this.term=null; this.vOS=null; }
-    onStart(term, vOS, ...args) { this.term=term; this.vOS=vOS; this.args = args;}
-    onCommand(input) { this.term.print(`[${this.name}]> ${input}`); }
-    onStop() { }
+  constructor(name) { this.name = name; this.term = null; this.vOS = null; }
+  onStart(term, vOS, ...args) { this.term = term; this.vOS = vOS; this.args = args; term.print(`[${this.name}] started.`); }
+  onCommand(input) { this.term.print(`[${this.name}]> ${input}`); }
+  onStop() { if (this.term) this.term.print(`[${this.name}] stopped.`); }
 }
 
 class AddonExecutor {
-    constructor() { this.addons={}; this.activeAddon=null; }
-    registerAddon(addon) { this.addons[addon.name.toLowerCase()] = addon; }
-    startAddon(name, term, vOS, ...args) {
-        if (this.activeAddon) { term.print("An addon is already running. Please 'exit' first."); return; }
-        const addon = this.addons[name.toLowerCase()];
-        if (addon) {
-            term.printHtml(`<p style=\"color: yellow;\">This addon runs in your browser. Only install trusted addons from official sources. Use at your own risk.</p>`);
-            this.activeAddon = addon;
-            addon.onStart(term, vOS, ...args);
-        } else {
-            term.print(`Addon not found: ${name}`);
-        }
-    }
-    stopAddon(term) {
-        if (this.activeAddon) {
-            this.activeAddon.onStop();
-            this.activeAddon = null;
-            if (term) term.print("Returned to main terminal.");
-        }
-    }
-    handleCommand(input) { if (this.activeAddon) this.activeAddon.onCommand(input); }
+  constructor() { this.addons = {}; this.active = null; }
+  register(addon) { this.addons[addon.name.toLowerCase()] = addon; }
+  start(name, term, vOS, ...args) {
+    if (this.active) { term.print("addon: another addon is running (use 'exit' or Ctrl+C)"); return; }
+    const a = this.addons[name.toLowerCase()];
+    if (!a) { term.print(`addon: not found: ${name}`); return; }
+    term.printHtml('<p style="color:yellow">This addon runs in-browser. Install trusted addons only.</p>');
+    this.active = a; a.onStart(term, vOS, ...args);
+  }
+  stop(term) { if (this.active) { this.active.onStop(); this.active = null; if (term) term.print('Returned to main terminal.'); } }
+  handle(input) { if (this.active) this.active.onCommand(input); }
 }
 
-// --- VirtualOS Class ---
-class VOS {
-    constructor() {
-        this.root = new VDirectory('/');
-        this.cwd = this.root;
-        this._initializeFileSystem();
-    }
-
-    _initializeFileSystem() {
-        this.createDirectory('/home');
-        this.createDirectory('/home/user');
-        this.createDirectory('/bin');
-        this.createDirectory('/etc');
-        this.createFile('/etc/motd', 'Welcome to the Central Terminal!\n\nHave a great day!');
-        this.createFile('/home/user/README.txt', 'This is a README file.');
-
-        // Create some demonstration files and directories
-        const demoContent = `
-## Welcome to the Virtual File System!
-
-This is a simple demonstration of the file system capabilities of the Central Terminal.
-
-You can use the following commands to navigate:
-
-- \`ls\` - List files and directories\n- \`cd\` - Change directory\n- \`cat\` - View file content\n- \`tree\` - Show the directory structure\n
-Enjoy exploring!
-`;
-
-        this.createDirectory('/docs');
-        this.createFile('/docs/guide.txt', demoContent);
-        this.createDirectory('/media');
-        this.createDirectory('/media/images');
-        this.createDirectory('/media/audio');
-    }
-
-    _resolvePath(path) {
-        if (path === '/') return this.root;
-        let parts = path.split('/').filter(p => p.length > 0);
-        let current = path.startsWith('/') ? this.root : this.cwd;
-        for (let part of parts) {
-            if (part === '..') current = this._getParent(current) || current;
-            else if (part !== '.') {
-                if (current instanceof VDirectory && current.getChild(part)) current = current.getChild(part);
-                else return null;
-            }
-        }
-        return current;
-    }
-
-    _getParent(node) {
-        if (node === this.root) return null;
-        const findParent = (dir, target) => {
-            for (const child of Object.values(dir.children)) {
-                if (child === target) return dir;
-                if (child instanceof VDirectory) {
-                    const found = findParent(child, target);
-                    if (found) return found;
-                }
-            }
-            return null;
-        }
-        return findParent(this.root, node);
-    }
-
-    _getFullPath(directory) {
-        if (directory === this.root) return '/';
-        let path = '';
-        let current = directory;
-        while (current && current !== this.root) {
-            path = '/' + current.name + path;
-            current = this._getParent(current);
-        }
-        return '/C/Users/user' + (path || '/');
-    }
-
-    createFile(path, content = '', type = 'text') {
-        const parts = path.split('/');
-        const filename = parts.pop();
-        const dirPath = parts.join('/');
-        const directory = this._resolvePath(dirPath);
-        if (directory instanceof VDirectory && !directory.children[filename]) {
-            directory.children[filename] = new VFile(filename, content, type);
-            return true;
-        }
-        return false;
-    }
-    
-    deleteFile(path) {
-        const parts = path.split('/');
-        const filename = parts.pop();
-        const dirPath = parts.join('/');
-        const directory = this._resolvePath(dirPath);
-        if (directory instanceof VDirectory && directory.getChild(filename) instanceof VFile) {
-            delete directory.children[filename];
-            return true;
-        }
-        return false;
-    }
-
-    createDirectory(path) {
-        const parts = path.split('/');
-        const dirname = parts.pop() || path;
-        const parentPath = parts.join('/');
-        const parentDir = this._resolvePath(parentPath);
-        if (parentDir instanceof VDirectory && !parentDir.children[dirname]) {
-            parentDir.children[dirname] = new VDirectory(dirname);
-            return true;
-        }
-        return false;
-    }
-
-    deleteDirectory(path) {
-        const dir = this._resolvePath(path);
-        if (dir instanceof VDirectory && Object.keys(dir.children).length === 0) {
-            const parent = this._getParent(dir);
-            if (parent) {
-                delete parent.children[dir.name];
-                return true;
-            }
-        }
-        return false;
-    }
-
-    listFiles(path = '.') {
-        const directory = this._resolvePath(path);
-        if (directory instanceof VDirectory) {
-            return Object.keys(directory.children).map(key => {
-                const child = directory.children[key];
-                if (child instanceof VDirectory) return `${key}/`;
-                if (child.type === 'exe') return `${key}*`;
-                return key;
-            });
-        }
-        return [];
-    }
-
-    changeDir(path) {
-        const newDir = this._resolvePath(path);
-        if (newDir instanceof VDirectory) {
-            this.cwd = newDir;
-            return true;
-        }
-        return false;
-    }
-}
-
-// --- BootCheck ---
-class BootCheck {
-    constructor(name, check, description = '') {
-        this.name = name;
-        this.check = check;
-        this.description = description;
-    }
-}
-
-class BootCheckRegistry {
-    constructor() { this.checks = []; }
-    addCheck(bootCheck) { this.checks.push(bootCheck); }
-    async runChecks(terminal) {
-        let allOk = true;
-        for (const check of this.checks) {
-            terminal.biosOutput.innerHTML += `<p>Running: ${check.name}... </p>`;
-            const result = await terminal.bootCheck(check.check);
-            terminal.biosOutput.innerHTML += `<span class=\"status-${result.status}\">${result.message}</span>`;
-            if (result.status === 'failed') allOk = false;
-        }
-        return allOk;
-    }
-}
-
-// --- Main Terminal Class ---
+// ---------- Main Terminal ----------
 export class CentralTerminal {
-    constructor(containerId) {
-        this.container = document.querySelector(containerId);
-        if (!this.container) { console.error(`Container with id ${containerId} not found.`); return; }
+  constructor(containerSelector) {
+    this.container = document.querySelector(containerSelector);
+    if (!this.container) { console.error(`Container ${containerSelector} not found`); return; }
 
-        this.biosScreen = document.getElementById('bios-screen');
-        this.biosOutput = document.getElementById('bios-output');
-        this.pseudoTerminal = document.getElementById('pseudo-terminal');
-        this.output = this.container.querySelector('#terminalOutput');
-        this.input = this.container.querySelector('#terminal-command-input');
-        
-        this.bootCheckRegistry = new BootCheckRegistry();
-        this.vOS = new VOS();
-        this.addonExecutor = new AddonExecutor();
-        this.commands = {};
-        this.commandHistory = [];
+    // expected DOM structure inside container
+    this.output = this.container.querySelector('#terminalOutput');
+    this.input = this.container.querySelector('#terminal-command-input');
+    this.biosScreen = document.getElementById('bios-screen');
+    this.biosOutput = document.getElementById('bios-output');
+    this.pseudoTerminal = document.getElementById('pseudo-terminal');
 
-        this.addonRegistry = {
-            'cowsay': 'https://raw.githubusercontent.com/piotrstakh/cowsay/master/cowsay.js',
-            'sl': 'https://raw.githubusercontent.com/mtoyoda/sl/master/sl.js',
-        };
-        this.downloadPath = '/home/user/addons';
+    this.vOS = this._loadState() || new VOS();
+    this.bootChecks = new BootCheckRegistry();
+    this.addons = new AddonExecutor();
+    this.commands = {};
 
-        this.editor = {
-            isActive: false,
-            lines: [],
-            filePath: null,
-            isDirty: false,
-        };
+    this.username = 'user';
+    this.hostname = 'central-terminal';
 
-        this.rps = {
-            isActive: false,
-            playerScore: 0,
-            computerScore: 0,
-            gamesPlayed: 0,
-        };
+    this.commandHistory = this._loadHistory();
+    this.historyIndex = null; // for arrow navigation
 
-        this._registerDefaultCommands();
-        
-        this.input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                this.runCommand(this.input.value);
-                this.input.value = '';
-            }
-        });
+    this.editor = { isActive: false, lines: [], filePath: null, dirty: false };
+    this.rps = { isActive: false, player: 0, cpu: 0, rounds: 0 };
+
+    this._registerDefaultCommands();
+    this._wireKeyboard();
+  }
+
+  // ------- Boot -------
+  async boot() {
+    this._biosClear();
+    this._biosWriteLine('<p>CWP Open Terminal Emulator</p><p>© 2025 ClockWorks Production</p><p>&nbsp;</p>');
+    const allOk = await this.bootChecks.run(this);
+    this._biosWriteLine('&nbsp;');
+    if (allOk) {
+      this._biosWriteLine('<p>Booting complete.</p>');
+      setTimeout(() => {
+        this.biosScreen.style.display = 'none';
+        this.pseudoTerminal.style.display = 'flex';
+        this.print(this._motd());
+        this.print("Type 'help' to see commands.");
+      }, 400);
+    } else {
+      this._biosWriteLine('<p class="status-failed">Boot failed. Please check the system.</p>');
+    }
+  }
+
+  addBootCheck(obj) { this.bootChecks.add(new BootCheck(obj.name, obj.check, obj.description)); }
+  registerAddon(addon) { this.addons.register(addon); }
+  addCommand(cmd) { this.commands[cmd.name] = cmd; (cmd.aliases||[]).forEach(a => this.commands[a] = cmd); }
+
+  // ------- Rendering -------
+  _sanitizeHtml(html) {
+    const allowedTags = ['p','b','i','u','em','strong','pre','code','span','div','img','audio'];
+    const allowedAttrs = ['style','src','alt','controls'];
+    const el = document.createElement('div'); el.innerHTML = html;
+    el.querySelectorAll('*').forEach(node => {
+      if (!allowedTags.includes(node.tagName.toLowerCase())) { node.remove(); return; }
+      for (const attr of [...node.attributes]) if (!allowedAttrs.includes(attr.name.toLowerCase())) node.removeAttribute(attr.name);
+    });
+    return el.innerHTML;
+  }
+  _scroll() { this.output.scrollTop = this.output.scrollHeight; }
+  print(text = '') { const p = document.createElement('p'); p.textContent = text; this.output.appendChild(p); this._scroll(); }
+  printHtml(html) { const d = document.createElement('div'); d.innerHTML = this._sanitizeHtml(html); this.output.appendChild(d); this._scroll(); }
+  clear() { this.output.innerHTML = ''; }
+  prompt() {
+    const cwd = this.vOS.pathOf(this.vOS.cwd);
+    const home = this.vOS.homePath;
+    const display = cwd.startsWith(home) ? '~' + cwd.slice(home.length) : cwd;
+    return `${this.username}@${this.hostname}:${display}$`;
+  }
+  _motd() {
+    const motd = this.vOS.readFile('/etc/motd');
+    return motd ? motd : 'Welcome.';
+  }
+
+  // ------- BIOS helpers -------
+  _biosClear(){ if (this.biosOutput) this.biosOutput.innerHTML=''; }
+  _biosWrite(html){ if (this.biosOutput) this.biosOutput.innerHTML += html; }
+  _biosWriteLine(html){ if (this.biosOutput) this._biosWrite(`<p>${html}</p>`); }
+
+  // ------- Keyboard wiring -------
+  _wireKeyboard() {
+    if (!this.input) return;
+    this.input.addEventListener('keydown', (e) => {
+      // Ctrl+C handling
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        this.print('^C');
+        if (this.editor.isActive) this._editorStop();
+        else if (this.rps.isActive) this._rpsStop();
+        else if (this.addons.active) this.addons.stop(this);
+        return;
+      }
+      // history nav
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (this.commandHistory.length === 0) return;
+        if (this.historyIndex === null) this.historyIndex = this.commandHistory.length;
+        if (e.key === 'ArrowUp') this.historyIndex = Math.max(0, this.historyIndex - 1);
+        else this.historyIndex = Math.min(this.commandHistory.length, this.historyIndex + 1);
+        this.input.value = this.historyIndex === this.commandHistory.length ? '' : this.commandHistory[this.historyIndex];
+        return;
+      }
+      // autocomplete
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        this._autoComplete();
+        return;
+      }
+      // run on Enter
+      if (e.key === 'Enter') {
+        const cmd = this.input.value;
+        this.input.value = '';
+        this.historyIndex = null;
+        this.runCommand(cmd);
+      }
+    });
+  }
+
+  // ------- Persistence -------
+  _saveState() {
+    try {
+      localStorage.setItem('central.vfs', JSON.stringify(this.vOS.toJSON()));
+      localStorage.setItem('central.cwd', this.vOS.pathOf(this.vOS.cwd));
+    } catch {}
+  }
+  _loadState() {
+    try {
+      const raw = localStorage.getItem('central.vfs');
+      const cwd = localStorage.getItem('central.cwd');
+      if (!raw) return null;
+      const vos = VOS.fromJSON(JSON.parse(raw));
+      if (cwd) vos.chdir(cwd);
+      return vos;
+    } catch { return null; }
+  }
+  _saveHistory(){ try { localStorage.setItem('central.hist', JSON.stringify(this.commandHistory)); } catch {} }
+  _loadHistory(){ try { return JSON.parse(localStorage.getItem('central.hist')||'[]'); } catch { return []; } }
+
+  // ------- Command system -------
+  _registerDefaultCommands() {
+    const cmd = (name, description, execute, aliases=[]) => ({ name, description, execute, aliases });
+    const unixErr = (msg) => `bash: ${msg}`;
+
+    this.addCommand(cmd('pwd', 'print working directory', () => this.print(this.vOS.pathOf(this.vOS.cwd))));
+
+    this.addCommand(cmd('ls', 'list directory contents', (args) => {
+      const path = args[0] || '.';
+      const list = this.vOS.ls(path);
+      if (!list) { this.print(unixErr(`ls: cannot access '${path}': No such file or directory`)); return; }
+      this.print(list.join('\n'));
+    }));
+
+    this.addCommand(cmd('cd', 'change directory', (args) => {
+      const path = args[0] || this.vOS.homePath;
+      if (!this.vOS.chdir(path)) this.print(unixErr(`cd: ${path}: No such file or directory`));
+      this._saveState();
+    }));
+
+    this.addCommand(cmd('cat', 'concatenate files and print', (args) => {
+      const path = args[0];
+      if (!path) { this.print('usage: cat <file>'); return; }
+      const node = this.vOS.resolve(path);
+      if (!node) { this.print(unixErr(`cat: ${path}: No such file or directory`)); return; }
+      if (node instanceof VDirectory) { this.print(unixErr(`cat: ${path}: Is a directory`)); return; }
+      if (node.ftype === 'text') node.content.split('\n').forEach(line => this.print(line));
+      else if (node.ftype === 'image') this.printHtml(`<img src="${node.content}" alt="${node.name}" style="max-width:100%;height:auto">`);
+      else if (node.ftype === 'audio') this.printHtml(`<audio controls src="${node.content}">Not supported</audio>`);
+      else if (node.ftype === 'exe') this.print('[Executable] run with: run ' + node.name);
+      else this.print(`unsupported type: ${node.ftype}`);
+    }));
+
+    this.addCommand(cmd('mkdir', 'make directories', (args) => {
+      const p = args[0]; if (!p) { this.print('usage: mkdir <dir>'); return; }
+      if (!this.vOS.mkdir(p)) this.print(unixErr(`mkdir: cannot create directory '${p}'`));
+      this._saveState();
+    }));
+
+    this.addCommand(cmd('rmdir', 'remove empty directories', (args) => {
+      const p = args[0]; if (!p) { this.print('usage: rmdir <dir>'); return; }
+      if (!this.vOS.rmdir(p)) this.print(unixErr(`rmdir: failed to remove '${p}'`));
+      this._saveState();
+    }));
+
+    this.addCommand(cmd('touch', 'create file or update timestamp', (args) => {
+      const p = args[0]; if (!p) { this.print('usage: touch <file>'); return; }
+      const node = this.vOS.resolve(p);
+      if (node instanceof VFile) { node.mtime = nowISO(); this.print(''); }
+      else { if (!this.vOS.writeFile(p, '')) this.print(unixErr(`touch: cannot touch '${p}'`)); }
+      this._saveState();
+    }));
+
+    this.addCommand(cmd('rm', 'remove files', (args) => {
+      const p = args[0]; if (!p) { this.print('usage: rm <file>'); return; }
+      if (!this.vOS.unlink(p)) this.print(unixErr(`rm: cannot remove '${p}'`));
+      this._saveState();
+    }));
+
+    this.addCommand(cmd('echo', 'display a line of text', (args) => this.print(args.join(' '))));
+
+    this.addCommand(cmd('history', 'command history (!n to rerun)', () => {
+      this.commandHistory.forEach((c,i)=> this.print(`${i+1}  ${c}`));
+    }));
+
+    this.addCommand(cmd('date', 'print system date and time', () => this.print(new Date().toString()), ['time']));
+
+    this.addCommand(cmd('clear', 'clear the screen', () => this.clear()));
+
+    this.addCommand(cmd('run', 'run a registered addon', (args) => {
+      if (!args[0]) { this.print('usage: run <addon> [args]'); return; }
+      this.addons.start(args[0], this, this.vOS, ...args.slice(1));
+    }));
+
+    this.addCommand(cmd('exit', 'exit current mode or addon', () => {
+      if (this.editor.isActive) this._editorStop();
+      else if (this.rps.isActive) this._rpsStop();
+      else this.addons.stop(this);
+    }));
+
+    // Simulated network tools (client-only)
+    this.addCommand(cmd('ping', 'check connectivity (simulated)', async (args) => {
+      const host = args[0]; if (!host) { this.print('usage: ping <host>'); return; }
+      const n = Math.floor(Math.random()*4)+1; // 1..4 echoes
+      for (let i=1;i<=n;i++) {
+        const ms = Math.floor(20+Math.random()*180);
+        await new Promise(r=>setTimeout(r, ms));
+        this.print(`64 bytes from ${host}: icmp_seq=${i} time=${ms} ms`);
+      }
+      this.print(`--- ${host} ping statistics ---`);
+      this.print(`${n} packets transmitted, ${n} received, 0% packet loss`);
+    }));
+
+    this.addCommand(cmd('curl', 'fetch URL (best-effort, may be blocked by CORS)', async (args) => {
+      const url = args[0]; if (!url) { this.print('usage: curl <url>'); return; }
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        this.print(text);
+      } catch (e) {
+        this.print(`curl: (6) Could not resolve host or blocked by CORS: ${url}`);
+      }
+    }));
+
+    this.addCommand(cmd('edit', 'simple vi-like editor (:w, :q, :wq)', (args) => {
+      const p = args[0]; if (!p) { this.print('usage: edit <file>'); return; }
+      this._editorStart(p);
+    }));
+
+    this.addCommand(cmd('rps', 'play Rock, Paper, Scissors', () => this._rpsStart()));
+
+    this.addCommand(cmd('tree', 'list contents of directories in a tree-like format', (args) => {
+      const p = args[0] || '.';
+      const dir = this.vOS.resolve(p);
+      if (!(dir instanceof VDirectory)) { this.print(unixErr(`tree: '${p}': No such directory`)); return; }
+      this.print(this.vOS.normalize(p));
+      this._tree(dir, '');
+    }));
+
+    this.addCommand(cmd('top', 'display processes (simulated)', () => {
+      this.print('PID   USER  PR NI  VIRT  RES  SHR  S %CPU %MEM   TIME+  COMMAND');
+      this.print('1     root  20  0  1.2g  80m  10m  R  3.2  0.2   0:01.23 systemd');
+      this.print('215   user  20  0  2.0g  96m  22m  S  1.1  0.3   0:00.54 node');
+      this.print('...');
+    }));
+
+    this.addCommand(cmd('help', 'list available commands', () => {
+      const uniq = [...new Set(Object.values(this.commands))];
+      const lines = uniq.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(10)} - ${c.description}`);
+      this.print(lines.join('\n'));
+    }));
+  }
+
+  _tree(dir, prefix) {
+    const entries = Object.values(dir.children);
+    entries.forEach((child, idx) => {
+      const last = idx === entries.length - 1;
+      const branch = last ? '└── ' : '├── ';
+      const nextPref = prefix + (last ? '    ' : '│   ');
+      this.print(prefix + branch + child.name + (child.kind==='dir'?'/':''));
+      if (child instanceof VDirectory) this._tree(child, nextPref);
+    });
+  }
+
+  // ------- Interactive modes -------
+  _editorStart(path) {
+    this.editor.isActive = true; this.editor.filePath = this.vOS.normalize(path);
+    const node = this.vOS.resolve(path);
+    this.editor.lines = (node instanceof VFile ? node.content : '').split('\n');
+    this.editor.dirty = false;
+    this.clear();
+    this.print(`Editing \"${this.editor.filePath}\". Type and press Enter to add a line.`);
+    this.print('Commands: :w (save), :q (quit), :wq (save & quit)');
+    this.print('---');
+    this.editor.lines.forEach((line,i)=> this.print(`${String(i+1).padStart(3)}  ${line}`));
+  }
+  _editorHandle(input) {
+    if (input.startsWith(':')) {
+      const cmd = input.substring(1);
+      if (cmd === 'w') { this._editorSave(); }
+      else if (cmd === 'q') { if (this.editor.dirty) this.print('Unsaved changes. Use :w or :wq.'); else this._editorStop(); }
+      else if (cmd === 'wq') { this._editorSave(); this._editorStop(); }
+      else this.print(`Unknown editor command: ${cmd}`);
+      return;
+    }
+    this.editor.lines.push(input); this.editor.dirty = true; this.print(`${String(this.editor.lines.length).padStart(3)}  ${input}`);
+  }
+  _editorSave() {
+    const content = this.editor.lines.join('\n');
+    if (!this.vOS.writeFile(this.editor.filePath, content, 'text', true)) { this.print('Error: could not save.'); return; }
+    this.editor.dirty = false; this.print('File saved.'); this._saveState();
+  }
+  _editorStop() {
+    this.editor.isActive = false; this.editor.lines = []; this.editor.filePath = null; this.editor.dirty = false;
+    this.clear(); this.print('Returned to main terminal.');
+  }
+
+  _rpsStart() {
+    this.rps.isActive = true; this.rps.player = 0; this.rps.cpu = 0; this.rps.rounds = 0;
+    this.clear();
+    this.print('--- Rock, Paper, Scissors ---');
+    this.print("Type: 'rock', 'paper', or 'scissors'. 'score' to view, 'exit' to quit.");
+    this.print('------------------------------');
+  }
+  _rpsHandle(input) {
+    const s = input.trim().toLowerCase();
+    if (s === 'exit') { this._rpsStop(); return; }
+    if (s === 'score') { this._rpsScore(); return; }
+    if (!['rock','paper','scissors'].includes(s)) { this.print('Invalid choice.'); return; }
+    const opts = ['rock','paper','scissors'];
+    const cpu = opts[Math.floor(Math.random()*3)];
+    this.print(`> You: ${s} | Computer: ${cpu}`);
+    if (s === cpu) this.print("It's a tie!");
+    else if ((s==='rock'&&cpu==='scissors')||(s==='paper'&&cpu==='rock')||(s==='scissors'&&cpu==='paper')) { this.print('You win this round!'); this.rps.player++; }
+    else { this.print('Computer wins this round.'); this.rps.cpu++; }
+    this.rps.rounds++; this.print('---');
+  }
+  _rpsScore(){ this.print('-- Score --'); this.print(`Player: ${this.rps.player}`); this.print(`Computer: ${this.rps.cpu}`); this.print(`Rounds: ${this.rps.rounds}`); this.print('-----------'); }
+  _rpsStop(){ this.rps.isActive = false; this.clear(); this.print('Thanks for playing!'); this._rpsScore(); }
+
+  // ------- Autocomplete -------
+  _autoComplete() {
+    const text = this.input.value;
+    if (!text.trim()) return;
+    const parts = text.match(/(?:[^\s\"]+|\"[^\"]*\")+/g) || [];
+    const last = parts[parts.length-1] || '';
+    const isPathy = last.startsWith('/') || last.startsWith('.') || last.startsWith('~');
+
+    if (parts.length === 1 && !isPathy) {
+      // command completion
+      const all = [...new Set(Object.values(this.commands))].map(c=>c.name);
+      const matches = all.filter(n=> n.startsWith(last));
+      if (matches.length === 1) this.input.value = matches[0] + ' ';
+      else if (matches.length > 1) this.print(matches.join('  '));
+      return;
     }
 
-    async boot() {
-        this.biosOutput.innerHTML = '';
-        this.biosOutput.innerHTML += `<p>CWP Open Terminal Emulator</p><p>Copyright (C) 2025 ClockWorks Production</p><p>&nbsp;</p>`;
-        const allOk = await this.bootCheckRegistry.runChecks(this);
-        this.biosOutput.innerHTML += `<p>&nbsp;</p>`;
-        if (allOk) {
-            this.biosOutput.innerHTML += `<p>Booting complete.</p>`;
-            setTimeout(() => {
-                this.biosScreen.style.display = 'none';
-                this.pseudoTerminal.style.display = 'flex';
-                this.print("Welcome to Central Terminal!");
-                this.print("Type 'help' to see a list of available commands.");
-            }, 1000);
-        } else {
-            this.biosOutput.innerHTML += `<p class=\"status-failed\">Boot failed. Please check the system.</p>`;
-        }
+    // path completion
+    const before = parts.slice(0,-1).join(' ');
+    const path = last;
+    const norm = this.vOS.normalize(path);
+    const dirPath = norm.endsWith('/') ? norm : norm.slice(0, norm.lastIndexOf('/')+1);
+    const base = norm.slice(dirPath.length);
+    const dir = this.vOS.resolve(dirPath || '.');
+    if (!(dir instanceof VDirectory)) return;
+    const ents = Object.keys(dir.children).filter(n=> n.startsWith(base));
+    if (ents.length === 1) {
+      const comp = dirPath + ents[0];
+      const node = dir.children[ents[0]];
+      const suffix = node instanceof VDirectory ? '/' : ' ';
+      this.input.value = (before ? before+' ' : '') + comp + suffix;
+    } else if (ents.length > 1) {
+      this.print(ents.join('  '));
+    }
+  }
+
+  // ------- Command runner -------
+  runCommand(rawInput) {
+    const input = rawInput.trim();
+    if (!input) return;
+    // prompt echo
+    this.print(`${this.prompt()} ${input}`);
+
+    // history (avoid dup consecutive)
+    if (this.commandHistory[this.commandHistory.length-1] !== input) {
+      this.commandHistory.push(input); this._saveHistory();
     }
 
-    addBootCheck(bootCheck) { this.bootCheckRegistry.addCheck(new BootCheck(bootCheck.name, bootCheck.check, bootCheck.description)); }
-    registerAddon(addon) { this.addonExecutor.registerAddon(addon); }
-    addCommand(command) { this.commands[command.name] = command; if(command.aliases) command.aliases.forEach(alias => this.commands[alias] = command); }
+    // editor / rps modes
+    if (this.editor.isActive) { this._editorHandle(input); return; }
+    if (this.rps.isActive) { this._rpsHandle(input); return; }
 
-    bootCheck(check) {
-        return new Promise(resolve => {
-            check().then(success => resolve({ status: success ? 'ok' : 'failed', message: success ? 'OK' : 'FAILED' }))
-                   .catch(() => resolve({ status: 'failed', message: 'FAILED' }));
-        });
+    // history expansion !n
+    if (input.startsWith('!')) {
+      const idx = parseInt(input.slice(1),10)-1;
+      const cmd = this.commandHistory[idx];
+      if (cmd) this.runCommand(cmd); else this.print('bash: history: invalid index');
+      return;
     }
 
-    _sanitizeHtml(html) {
-        const allowedTags = ['p', 'b', 'i', 'u', 'em', 'strong', 'pre', 'code', 'span', 'div', 'img', 'audio'];
-        const allowedAttrs = ['style', 'src', 'alt', 'controls'];
+    // addon active
+    if (this.addons.active) { this.addons.handle(input); return; }
 
-        const el = document.createElement('div');
-        el.innerHTML = html;
-
-        el.querySelectorAll('*').forEach(node => {
-            // Remove disallowed tags
-            if (!allowedTags.includes(node.tagName.toLowerCase())) {
-                node.parentNode.removeChild(node);
-                return;
-            }
-
-            // Remove disallowed attributes
-            for (const attr of [...node.attributes]) {
-                if (!allowedAttrs.includes(attr.name.toLowerCase())) {
-                    node.removeAttribute(attr.name);
-                }
-            }
-        });
-
-        return el.innerHTML;
-    }
-
-    print(text) { const p = document.createElement('p'); p.textContent = text; this.output.appendChild(p); this.output.scrollTop = this.output.scrollHeight; }
-    printHtml(html) { const div = document.createElement('div'); div.innerHTML = this._sanitizeHtml(html); this.output.appendChild(div); this.output.scrollTop = this.output.scrollHeight; }
-    clear() { this.output.innerHTML = ''; }
-
-    _registerDefaultCommands() {
-        this.addCommand(new Command("pwd", "Print current working directory", () => this.print(this.vOS._getFullPath(this.vOS.cwd))));
-        this.addCommand(new Command("ls", "List files in current directory", (args) => {
-            const path = args[0] || '.';
-            const files = this.vOS.listFiles(path);
-            this.print(files.length > 0 ? files.join('\n') : "Empty directory.");
-        }));
-        this.addCommand(new Command("cd", "Change directory", (args) => {
-            if (!args[0] || !this.vOS.changeDir(args[0])) this.print(`cd: no such file or directory: ${args[0] || ''}`);
-        }));
-        this.addCommand(new Command("cat", "Display file contents", (args) => {
-            const file = this.vOS._resolvePath(args[0] || '');
-            if (!file || !(file instanceof VFile)) { this.print(`cat: No such file: ${args[0]}`); return; }
-            switch (file.type) {
-                case 'text': file.content.split('\n').forEach(line => this.print(line)); break;
-                case 'image': this.printHtml(`<img src=\"..${file.content}\" alt=\"${file.name}\" style=\"max-width: 100%; height: auto;\">`); break;
-                case 'audio': this.printHtml(`<audio controls src=\"${file.content}\">Your browser does not support audio playback.</audio>`); break;
-                case 'exe': this.print(`[Executable] To run this, type: run ${file.name}`); break;
-                default: this.print(`Unsupported file type: ${file.type}`);
-            }
-        }));
-        this.addCommand(new Command("mkdir", "Create a directory", (args) => {
-            if (!args[0] || !this.vOS.createDirectory(args[0])) this.print(`mkdir: cannot create directory: ${args[0] || ''}`);
-        }));
-        this.addCommand(new Command("rmdir", "Remove an empty directory", (args) => {
-            if (!args[0] || !this.vOS.deleteDirectory(args[0])) this.print(`rmdir: failed to remove '${args[0]}': No such file or directory, or directory not empty`);
-        }));
-        this.addCommand(new Command("touch", "Create an empty file", (args) => {
-             if (!args[0]) { this.print("Usage: touch <filename>"); return; }
-             if (!this.vOS.createFile(args[0])) this.print(`touch: cannot create file: ${args[0]}`);
-        }));
-        this.addCommand(new Command("rm", "Delete a file", (args) => {
-            if (!args[0]) { this.print("Usage: rm <filename>"); return; }
-            if (!this.vOS.deleteFile(args[0])) this.print(`rm: cannot remove '${args[0]}': No such file or directory`);
-        }));
-        this.addCommand(new Command("echo", "Print text", (args) => this.print(args.join(" "))));
-        this.addCommand(new Command("history", "Show command history. Use !<number> to rerun.", () => {
-            this.commandHistory.forEach((cmd, index) => this.print(`${index + 1}: ${cmd}`));
-        }));
-        this.addCommand(new Command("date", "Displays the current date and time.", () => this.print(new Date().toLocaleString()), ["time"]));
-        this.addCommand(new Command("clear", "Clear terminal output", () => this.clear()));
-        this.addCommand(new Command("run", "Run a registered addon", (args) => {
-            if (!args[0]) { this.print("Usage: run <addon-name> [args]"); return; }
-            this.addonExecutor.startAddon(args[0], this, this.vOS, ...args.slice(1));
-        }));
-        this.addCommand(new Command("exit", "Exits the current addon.", () => {
-            if(this.rps.isActive) {
-                this._stopRps();
-            } else if (this.editor.isActive) {
-                this._stopEditor();
-            }
-        }));
-        this.addCommand(new Command('ping', 'Check network connectivity to a host.', async (args) => {
-            const host = args[0];
-            if (!host) {
-                this.print('Usage: ping <host>');
-                return;
-            }
-    
-            this.print(`Pinging ${host}...`);
-            const startTime = performance.now();
-    
-            try {
-                await fetch(`https://${host}`, { mode: 'no-cors' });
-                const duration = (performance.now() - startTime).toFixed(2);
-                this.print(`Pong! Response from ${host} in ${duration}ms`);
-            } catch (error) {
-                this.print(`Ping failed: Could not resolve host ${host}`);
-            }
-        }));
-        this.addCommand(new Command('curl', 'Fetch content from a URL.', async (args) => {
-            const url = args[0];
-            if (!url) {
-                this.print('Usage: curl <url>');
-                return;
-            }
-    
-            this.print(`Fetching from ${url}...\n`);
-            try {
-                const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-                const response = await fetch(proxyUrl);
-    
-                if (!response.ok) {
-                    throw new Error(`Request failed with status: ${response.status}`);
-                }
-    
-                const text = await response.text();
-                this.print(text);
-            } catch (error) {
-                this.print(`Error: ${error.message}`);
-            }
-        }));
-        this.addCommand(new Command('edit', 'Edit a file using a simple vi-like editor.', (args) => {
-            const path = args[0];
-            if (!path) {
-                this.print('Usage: edit <filename>');
-                return;
-            }
-            this._startEditor(path);
-        }));
-        this.addCommand(new Command('rps', 'Play Rock, Paper, Scissors.', () => {
-            this._startRps();
-        }));
-        this.addCommand(new Command('tree', 'Display the file system tree.', (args) => {
-            const path = args[0] || '.';
-            const dir = this.vOS._resolvePath(path);
-            if (dir instanceof VDirectory) {
-                this.print(path);
-                this._printTree(dir);
-            } else {
-                this.print(`tree: '${path}': No such directory`);
-            }
-        }));
-        this.addCommand(new Command('top', 'Display system processes (simulated).', () => {
-            this.print('PID   USER     PR  NI  VIRT   RES   SHR   S  %CPU %MEM     TIME+  COMMAND');
-            this.print('1     root     20   0  12.1g  1.2g  1.1g   R  12.5  0.8   1:05.35  systemd');
-            this.print('2     user     20   0  1.4g   1.1g  1.0g   S   6.2  0.7   0:33.12  Xorg');
-            this.print('3     user     20   0  2.2g   512m  256m   S   3.1  0.4   0:12.45  gnome-shell');
-            this.print('4     user     20   0  8.3g   256m  128m   S   1.5  0.2   0:05.18  node');
-            this.print('...');
-        }));
-        this.addCommand(new Command("help", "List available commands", () => {
-            const helpText = [...new Set(Object.values(this.commands))].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(15)}- ${c.description}`).join('\n');
-            this.printHtml(`<pre>${helpText}</pre>`);
-        }));
-    }
-
-    _printTree(directory, prefix = '') {
-        const children = Object.values(directory.children);
-        children.forEach((child, index) => {
-            const isLast = index === children.length - 1;
-            const newPrefix = prefix + (isLast ? '    ' : '│   ');
-            this.print(prefix + (isLast ? '└── ' : '├── ') + child.name);
-            if (child instanceof VDirectory) {
-                this._printTree(child, newPrefix);
-            }
-        });
-    }
-
-    _startEditor(path) {
-        this.editor.isActive = true;
-        this.editor.filePath = path;
-        const fileNode = this.vOS._resolvePath(path);
-        this.editor.lines = fileNode && fileNode.content ? fileNode.content.split('\n') : [];
-        this.editor.isDirty = false;
-        this.clear();
-        this.print(`Editing "${path}". Type text and press Enter to add a line.`);
-        this.print('Use ":w" to save, ":q" to quit, ":q!" to force quit.');
-        this.print('---');
-        this.editor.lines.forEach(line => this.print(line));
-    }
-
-    _handleEditorCommand(input) {
-        if (input.startsWith(':')) {
-            const command = input.substring(1);
-            switch (command) {
-                case 'w':
-                    this._saveFile();
-                    break;
-                case 'q':
-                    if (this.editor.isDirty) {
-                        this.print('You have unsaved changes. Use ":q!" to discard or ":w" to save.');
-                    } else {
-                        this._stopEditor();
-                    }
-                    break;
-                case 'q!':
-                    this._stopEditor();
-                    break;
-                default:
-                    this.print(`Unknown editor command: ${command}`);
-                    break;
-            }
-        } else {
-            this.editor.lines.push(input);
-            this.editor.isDirty = true;
-            this.print(input);
-        }
-    }
-
-    _saveFile() {
-        const newContent = this.editor.lines.join('\n');
-        const fileNode = this.vOS._resolvePath(this.editor.filePath);
-        if (fileNode) {
-            fileNode.content = newContent;
-        } else {
-            if (!this.vOS.createFile(this.editor.filePath, newContent)) {
-                this.print(`Error: Could not create file at ${this.editor.filePath}`);
-                return;
-            }
-        }
-        this.editor.isDirty = false;
-        this.print('File saved.');
-    }
-
-    _stopEditor() {
-        this.editor.isActive = false;
-        this.editor.lines = [];
-        this.editor.filePath = null;
-        this.editor.isDirty = false;
-        this.clear();
-        this.print("Returned to main terminal.");
-    }
-
-    _startRps() {
-        this.rps.isActive = true;
-        this.rps.playerScore = 0;
-        this.rps.computerScore = 0;
-        this.rps.gamesPlayed = 0;
-        this.clear();
-        this.print('--- Rock, Paper, Scissors ---');
-        this.print('Type your choice: \'rock\', \'paper\', or \'scissors\'.');
-        this.print('Use \'score\' to see the score, or \'exit\' to quit.');
-        this.print('------------------------------');
-    }
-
-    _handleRpsCommand(input) {
-        const playerChoice = input.trim().toLowerCase();
-
-        if (playerChoice === 'exit') {
-            this._stopRps();
-            return;
-        }
-
-        if (playerChoice === 'score') {
-            this._printRpsScore();
-            return;
-        }
-
-        if (!['rock', 'paper', 'scissors'].includes(playerChoice)) {
-            this.print(`Invalid choice. Please choose rock, paper, or scissors.`);
-            return;
-        }
-
-        const choices = ['rock', 'paper', 'scissors'];
-        const computerChoice = choices[Math.floor(Math.random() * choices.length)];
-
-        this.print(`> You: ${playerChoice} | Computer: ${computerChoice}`);
-
-        if (playerChoice === computerChoice) {
-            this.print("It's a tie!");
-        } else if (
-            (playerChoice === 'rock' && computerChoice === 'scissors') ||
-            (playerChoice === 'paper' && computerChoice === 'rock') ||
-            (playerChoice === 'scissors' && computerChoice === 'paper')
-        ) {
-            this.print("You win this round!");
-            this.rps.playerScore++;
-        } else {
-            this.print("Computer wins this round.");
-            this.rps.computerScore++;
-        }
-        this.rps.gamesPlayed++;
-        this.print('---');
-    }
-
-    _printRpsScore() {
-        this.print('-- Score --');
-        this.print(`Player: ${this.rps.playerScore}`);
-        this.print(`Computer: ${this.rps.computerScore}`);
-        this.print(`Rounds Played: ${this.rps.gamesPlayed}`);
-        this.print('-----------');
-    }
-
-    _stopRps() {
-        this.rps.isActive = false;
-        this.clear();
-        this.print('Thanks for playing Rock, Paper, Scissors!');
-        this._printRpsScore();
-    }
-
-    _ensureAddonDir() {
-        if (!this.vOS._resolvePath(this.downloadPath)) {
-            this.vOS.createDirectory(this.downloadPath);
-        }
-    }
-
-    async _installPackage(pkgName) {
-        if (!pkgName) {
-            this.print('Usage: tpkg install <package_name>');
-            return;
-        }
-
-        const url = this.addonRegistry[pkgName];
-        if (!url) {
-            this.print(`Package not found in registry: ${pkgName}`);
-            return;
-        }
-
-        this.print(`Downloading ${pkgName} from ${url}...`);
-        try {
-            const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-            const response = await fetch(proxyUrl);
-            if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status}`);
-            }
-            const code = await response.text();
-            const filePath = `${this.downloadPath}/${pkgName}.js`;
-
-            if (this.vOS._resolvePath(filePath)) {
-                this.vOS.deleteFile(filePath);
-            }
-            this.vOS.createFile(filePath, code);
-
-            this.print(`Successfully downloaded to ${filePath}.`);
-            this.print('NOTE: Dynamic installation is not supported. This is a simulation.');
-            this.print(`You can view the code with: cat ${filePath}`);
-
-        } catch (error) {
-            this.print(`Failed to install ${pkgName}: ${error.message}`);
-        }
-    }
-
-    _removePackage(pkgName) {
-        if (!pkgName) {
-            this.print('Usage: tpkg remove <package_name>');
-            return;
-        }
-
-        const filePath = `${this.downloadPath}/${pkgName}.js`;
-        if (this.vOS.deleteFile(filePath)) {
-            this.print(`Removed ${pkgName}.`);
-        } else {
-            this.print(`Package not installed: ${pkgName}`);
-        }
-    }
-
-    _listPackages() {
-        this.print('Available in registry:');
-        this.print(Object.keys(this.addonRegistry).map(name => `- ${name}`).join('\n'));
-
-        this.print('\nDownloaded packages:');
-        const downloaded = this.vOS.listFiles(this.downloadPath);
-        if (downloaded.length > 0) {
-            this.print(downloaded.map(name => `- ${name.replace('.js', '')}`).join('\n'));
-        } else {
-            this.print('None.');
-        }
-    }
-
-    runCommand(input) {
-        input = input.trim();
-        if (!input) return;
-
-        this.print(`> ${input}`);
-        if (this.commandHistory[this.commandHistory.length - 1] !== input) {
-            this.commandHistory.push(input);
-        }
-
-        if (this.editor.isActive) {
-            this._handleEditorCommand(input);
-            return;
-        }
-
-        if (this.rps.isActive) {
-            this._handleRpsCommand(input);
-            return;
-        }
-
-        if (input.startsWith('!')) {
-            const idx = parseInt(input.substring(1), 10) - 1;
-            const cmd = this.commandHistory[idx];
-            if (cmd) { this.runCommand(cmd); } 
-            else { this.print("Invalid history index."); }
-            return;
-        }
-
-        if (this.addonExecutor.activeAddon) {
-            this.addonExecutor.handleCommand(input);
-            return;
-        }
-
-        const parts = input.match(/(?:[^\s\"]+|"[^\"]*")+/g) || [];
-        const cmdName = parts.shift()?.replace(/\"/g, '').toLowerCase();
-        if (!cmdName) return;
-        
-        const args = parts.map(arg => arg.replace(/\"/g, ''));
-        const command = this.commands[cmdName];
-
-        if (command) {
-            command.execute(args, this);
-        } else {
-            this.print(`Command not recognized: ${cmdName}.`);
-        }
-    }
-
+    // parse
+    const parts = input.match(/(?:[^\s\"]+|\"[^\"]*\")+/g) || [];
+    const name = (parts.shift()||'').replace(/\"/g,'').toLowerCase();
+    const args = parts.map(a=>a.replace(/\"/g,''));
+    const cmd = this.commands[name];
+    if (!cmd) { this.print(`bash: ${name}: command not found`); return; }
+    cmd.execute(args, this);
+  }
 }
 
-export { Command };
+export { VOS, VFile, VDirectory, Addon, AddonExecutor, BootCheck, BootCheckRegistry };
