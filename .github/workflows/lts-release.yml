@@ -38,8 +38,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check for uncommitted changes
-        run: git status
+      - name: Sync package-lock.json
+        run: |
+          git add package-lock.json
+          git diff --staged --quiet || git commit -m "chore: sync package-lock.json"
 
       - name: Bump patch version and create Git tag
         run: |
