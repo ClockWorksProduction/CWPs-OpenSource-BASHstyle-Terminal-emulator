@@ -43,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Bump version and create Git tag
-        run: npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %s"
+        run: npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %%s"
 
       - name: Push changes and tags
         run: git push --follow-tags
