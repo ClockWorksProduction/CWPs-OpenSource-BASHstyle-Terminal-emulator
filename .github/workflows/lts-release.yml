@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check for uncommitted changes
+        run: git status
+
       - name: Bump patch version and create Git tag
         run: |
           npm version patch -m "chore(release): lts release %%s"
