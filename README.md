@@ -1,6 +1,7 @@
 # CWP Open Terminal Emulator
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+[![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator.svg)](https://www.npmjs.com/package/@clockworksproduction-studio/cwp-open-terminal-emulator)
 
 A modular, BASH-style terminal emulator library for the web. CWP Open Terminal Emulator is a lightweight, extensible, and easy-to-integrate solution for adding a terminal interface to your web applications.
 
@@ -10,7 +11,35 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 - **Virtual File System:** An in-memory file system to simulate file and directory operations.
 - **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
 - **Lightweight Core:** The core terminal is minimal, allowing you to add only the features you need.
-- **Official Addons:** A collection of optional, pre-built modules (addons) that add extra features like a package manager, text editor, and system monitoring tools. These are not required for the core terminal to function.
+- **Official Addons:** A collection of optional, pre-built modules (addons) that add extra features like a package manager, text editor, and system monitoring tools.
+
+## Installation
+
+This project uses a four-tier release system, allowing you to choose the stability level that best suits your needs.
+
+### Stable Version (`@latest`)
+This is the recommended version for most users. It is the official, production-ready release.
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@latest
+```
+
+### Long-Term Support (`@lts`)
+This channel provides critical bug fixes for a previous major version, offering maximum stability for large or legacy projects.
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
+```
+
+### Nightly Version (`@nightly`)
+A bi-weekly pre-release for developers who want to test upcoming features.
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
+```
+
+### Dev Version (`@dev`)
+The bleeding-edge version, published with every single commit to the `main` branch. Not recommended for production.
+```bash
+npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
+```
 
 ## Live Demo & Example
 
@@ -46,7 +75,7 @@ First, create an `index.html` file. This will serve as the entry point for your 
                 <div id="terminalOutput"></div>
             </div>
             <div id="terminal-input-panel">
-                <span id="terminal-prompt">&gt;</span>
+                <span id="terminal-prompt">></span>
                 <input type="text" id="terminal-command-input" autofocus />
             </div>
         </div>
@@ -63,24 +92,19 @@ First, create an `index.html` file. This will serve as the entry point for your 
 Next, create an `app.js` file. This is where you will import the terminal, register addons, and boot the system.
 
 ```javascript
-import { CentralTerminal, BootCheck } from '/src/index.js';
-import { register as registerRPS } from './addons/rps_addon.js';
-import { register as registerEditor } from './addons/editor.js';
-import { register as registerPkgManager } from './addons/pkg_manager.js';
-import { register as registerTop } from './addons/top.js';
-import { register as registerNet } from './addons/net.js';
+import { CentralTerminal, BootCheck } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
+// Note: When using addons, adjust the import path based on your project structure.
+// For example: import { register as registerRPS } from './node_modules/@clockworksproduction-studio/cwp-open-terminal-emulator/addons/rps_addon.js';
 
 // --- 1. Initialize the Terminal ---
 const term = new CentralTerminal('#central-terminal-container');
 
 // --- 2. Register Official Addons (Optional) ---
-// Addons are optional modules that add extra features. They are not required.
-// Here, we are adding commands like 'rps', 'edit', 'tpkg', 'top', and 'net'.
-registerRPS(term.addonExecutor);
-registerEditor(term.addonExecutor);
-registerPkgManager(term.addonExecutor);
-registerTop(term.addonExecutor);
-registerNet(term.addonExecutor);
+// Addons are optional modules that add extra features.
+// To use them, you would first need to import them, e.g.:
+// import { register as registerRPS } from './addons/rps_addon.js';
+// registerRPS(term.addonExecutor);
+
 
 // --- 3. Define Boot Checks ---
 // These checks run before the terminal is ready.
@@ -157,13 +181,13 @@ body {
 ## Documentation
 
 - [Addon System](docs/addons.md)
-- [Release & Publishing Guide](docs/release-system.md)
 - [Troubleshooting and FAQ](docs/troubleshooting.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
 ## Contributing
 
-We welcome contributions from the community! Please read our **[Contributing Guidelines](CONTRIBUTING.md)**.
+We welcome contributions from the community! This project follows an automated release system managed by GitHub Actions. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** for more details on the development process.
 
 ## License
 
