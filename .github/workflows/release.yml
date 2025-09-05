@@ -47,6 +47,9 @@ jobs:
           git add package-lock.json
           git diff --staged --quiet || git commit -m "chore: sync package-lock.json"
 
+      - name: Check git status
+        run: git status
+
       - name: Bump version, push, and publish
         run: |
           npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %s"
