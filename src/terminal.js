@@ -533,10 +533,42 @@ export class CentralTerminal {
       this.print('...');
     }));
 
+    this.addCommand(cmd('cp', 'copy files', (args) => {
+      const src = args[0]; if (!src) { this.print('usage: cp <src> <dst>'); return; }
+      const dst = args[1]; if (!dst) { this.print('usage: cp <src> <dst>'); return; }
+      const srcNode = this.vOS.resolve(src);
+      if (!srcNode) { this.print(unixErr(`cp: cannot access '${src}': No such file or directory`)); return; }
+      if (srcNode instanceof VDirectory) { this.print(unixErr(`cp: '${src}': Is a directory`)); return; }
+      if (!this.vOS.writeFile(dst, srcNode.content, srcNode.ftype)) this.print(unixErr(`cp: cannot create '${dst}'`));
+    }));
+
+    this.addCommand(cmd('mv', 'move or rename files', (args) => {
+      const src = args[0]; if (!src) { this.print('usage: mv <src> <dst>'); return; }
+      const dst = args[1]; if (!dst) { this.print('usage: mv <src> <dst>'); return; }
+      const srcNode = this.vOS.resolve(src);
+      if (!srcNode) { this.print(unixErr(`mv: cannot access '${src}': No such file or directory`)); return; }
+      if (srcNode instanceof VDirectory) { this.print(unixErr(`mv: '${src}': Is a directory`)); return; }
+      if (!this.vOS.unlink(src)) this.print(unixErr(`mv: cannot move '${src}'`));
+      if (!this.vOS.writeFile(dst, srcNode.content, srcNode.ftype)) this.print(unixErr(`mv: cannot create '${dst}'`));
+    }));
+
+    this.addCommand(cmd('find', 'find files by name', (args) => {
+      const path = args[0] || '.';
+      const name = args[1]; if (!name) { this.print('usage: find <path> <name>'); return; };
+    }));
+
+    this.addCommand(cmd('uname', 'print system information', () => this.print('Linux')));
+
+    this.addCommand(cmd('whoami', 'print current user', () => this.print(this.username)));
+
+    this.addCommand(cmd('who', 'print current user', () => this.print(this.username)));
+
+    this.addCommand(cmd('uptime', 'print system uptime', () => this.print('??:??:??')));
+
     this.addCommand(cmd('help', 'list available commands', () => {
       const uniq = [...new Set(Object.values(this.commands))];
-      const lines = uniq.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(10)} - ${c.description}`);
-      this.print(lines.join('\n'));
+      const lines = uniq.sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`${c.name.padEnd(10)} - ${c.description}`);      
+      for (const line of lines.join('\n').split('\n')) this.print(line);
     }));
   }
 
