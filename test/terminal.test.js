@@ -33,7 +33,7 @@ describe('CentralTerminal v5.0.0 Full Coverage', () => {
   });
 
   test('initializes with all core commands', () => {
-    const coreCommands = ['pwd','ls','cd','cat','mkdir','rmdir','touch','rm','echo','history','date','clear','run','exit','ping','curl','edit','rps','tree','top','help'];
+    const coreCommands = ['pwd','ls','cd','cat','mkdir','rmdir','touch','rm','echo','history','date','clear','run','exit','ping','curl','edit','rps','tree','top','help','cp','mv','find','uname','whoami','who','uptime'];
     coreCommands.forEach(cmd => {
       expect(term.commands[cmd]).toBeDefined();
     });
