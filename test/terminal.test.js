@@ -212,4 +212,53 @@ describe('CentralTerminal v5.0.0 Full Coverage', () => {
       // Autocomplete provides the full, absolute path.
       expect(term.input.value).toBe('cd /home/user/my_directory/');
   });
+  test('head and tail commands work', () => {
+    term.vOS.writeFile('/home/user/log.txt', 'line1\nline2\nline3\nline4');
+    term.runCommand('head -n 2 log.txt');
+    expect(term.print).toHaveBeenCalledWith('line1\nline2');
+    term.runCommand('tail -n 1 log.txt');
+    expect(term.print).toHaveBeenCalledWith('line4');
+  });
+
+  test('grep finds matching text', () => {
+    term.vOS.writeFile('/home/user/data.txt', 'apple\nbanana\ncherry');
+    term.runCommand('grep banana data.txt');
+    expect(term.print).toHaveBeenCalledWith('banana');
+  });
+
+  test('sort and uniq commands', () => {
+    term.vOS.writeFile('/home/user/list.txt', 'c\nb\na\na\nb');
+    term.runCommand('sort list.txt');
+    expect(term.print).toHaveBeenCalledWith('a\na\nb\nb\nc');
+    term.runCommand('uniq list.txt');
+    expect(term.print).toHaveBeenCalledWith('c\nb\na');
+  });
+
+  test('ps and kill commands', () => {
+    term.runCommand('ps');
+    expect(term.print.mock.calls.some(call => call[0].includes('PID'))).toBe(true);
+    term.runCommand('kill 123');
+    expect(term.print).toHaveBeenCalledWith('Process 123 terminated (simulated)');
+  });
+
+  test('system info commands', () => {
+    term.runCommand('df');
+    expect(term.print.mock.calls.some(call => call[0].includes('Filesystem'))).toBe(true);
+    term.runCommand('free');
+    expect(term.print.mock.calls.some(call => call[0].includes('Mem'))).toBe(true);
+    term.runCommand('id');
+    expect(term.print.mock.calls.some(call => call[0].includes('uid='))).toBe(true);
+  });
+
+  test('fun commands: fortune, cowsay, sl, cmatrix', () => {
+    term.runCommand('fortune');
+    expect(term.print.mock.calls.some(call => call[0].length > 0)).toBe(true);
+    term.runCommand('cowsay Moo!');
+    expect(term.print.mock.calls.some(call => call[0].includes('Moo!'))).toBe(true);
+    term.runCommand('sl'); // animated train
+    expect(term.print.mock.calls.some(call => call[0].includes('🚂'))).toBe(true);
+    term.runCommand('cmatrix'); // falling chars
+    expect(term.print.mock.calls.some(call => call[0].includes('matrix'))).toBe(true);
+  });
+
 });
