@@ -68,25 +68,27 @@ describe('CentralTerminal Emulator - Full Test (Expect Style)', () => {
 
   test('rm command deletes file', () => {
     term.runCommand('touch remove.txt');
-    const lsOutputBefore = term.runCommand('ls');  // should include remove.txt
-    expect(lsOutputBefore).toMatch(/remove.txt/);
+    term.runCommand('ls');
+    let calls = ui.appendTerminalOutput.mock.calls.flat();
+    expect(calls[calls.length - 1]).toMatch(/remove.txt/);  // file exists
   
     term.runCommand('rm remove.txt');
-    const lsOutputAfter = term.runCommand('ls');   // should NOT include remove.txt
-    expect(lsOutputAfter).not.toMatch(/remove.txt/);
+    term.runCommand('ls');
+    calls = ui.appendTerminalOutput.mock.calls.flat();
+    expect(calls[calls.length - 1]).not.toMatch(/remove.txt/);  // file gone
   });
   
   test('cp and mv commands', () => {
     term.runCommand('touch file1.txt');
-    
-    term.runCommand('cp file1.txt file2.txt'); // copy file
-    term.runCommand('mv file2.txt file3.txt'); // move file2 to file3
-    const lsOutput = term.runCommand('ls');
+    term.runCommand('cp file1.txt file2.txt');
+    term.runCommand('mv file2.txt file3.txt');
+    term.runCommand('ls');
+    const lastOutput = ui.appendTerminalOutput.mock.calls.flat().at(-1);
   
-    expect(lsOutput).toMatch(/file1.txt/);     // original exists
-    expect(lsOutput).toMatch(/file3.txt/);     // moved exists
-    expect(lsOutput).not.toMatch(/file2.txt/); // intermediate deleted
-  });    
+    expect(lastOutput).toMatch(/file1.txt/);   // original exists
+    expect(lastOutput).toMatch(/file3.txt/);   // moved exists
+    expect(lastOutput).not.toMatch(/file2.txt/); // no longer exists
+  });     
 
   test('rmdir command deletes directory', () => {
     term.runCommand('mkdir emptydir');
