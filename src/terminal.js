@@ -296,7 +296,7 @@ class CentralTerminal {
 
   // ---------- Default Commands ----------
   _registerDefaultCommands() {
-    const cmd = (name, desc, exec) => ({ name, desc, exec });
+    const cmd = (name, desc, exec) => ({ name, desc, execute: exec });
   
     // ---- Basic Navigation ----
     this.addCommand(cmd('ls', 'list files', args => {
@@ -320,23 +320,29 @@ class CentralTerminal {
     }));
     this.addCommand(cmd('rm', 'remove file', args => {
       if (!args[0]) { this._print('usage: rm <file>'); return; }
-      if (!this.vOS.unlink(args[0])) this._print(`rm: cannot remove '${args[0]}'`);
-    }));
+      const path = this.vOS.normalize(args[0]);
+      if (!this.vOS.unlink(path)) this._print(`rm: cannot remove '${args[0]}'`);
+    }));    
     this.addCommand(cmd('cp', 'copy file', args => {
       const [src, dest] = args;
       if (!src || !dest) { this._print('usage: cp <src> <dest>'); return; }
-      const node = this.vOS.resolve(src);
+      const srcPath = this.vOS.normalize(src);
+      const destPath = this.vOS.normalize(dest);
+      const node = this.vOS.resolve(srcPath);
       if (!(node instanceof VFile)) { this._print(`cp: cannot copy '${src}'`); return; }
-      this.vOS.writeFile(dest, node.content, node.ftype, true);
+      if (!this.vOS.writeFile(destPath, node.content, node.ftype, true)) this._print(`cp: cannot write to '${dest}'`);
     }));
+    
     this.addCommand(cmd('mv', 'move/rename file', args => {
       const [src, dest] = args;
       if (!src || !dest) { this._print('usage: mv <src> <dest>'); return; }
-      const node = this.vOS.resolve(src);
+      const srcPath = this.vOS.normalize(src);
+      const destPath = this.vOS.normalize(dest);
+      const node = this.vOS.resolve(srcPath);
       if (!node) { this._print(`mv: cannot stat '${src}'`); return; }
-      if (!this.vOS.writeFile(dest, node.content || '', node.ftype, true)) { this._print(`mv: cannot move to '${dest}'`); return; }
-      this.vOS.unlink(src);
-    }));
+      if (!this.vOS.writeFile(destPath, node.content || '', node.ftype, true)) { this._print(`mv: cannot move to '${dest}'`); return; }
+      if (!this.vOS.unlink(srcPath)) this._print(`mv: cannot remove '${src}' after move`);
+    }));    
     this.addCommand(cmd('touch', 'create empty file', args => {
       if (!args[0]) { this._print('usage: touch <file>'); return; }
       this.vOS.writeFile(args[0], '', 'text', true);
@@ -525,4 +531,4 @@ class CentralTerminal {
   }
 }
 
-export { CentralTerminal, BootCheck, BootCheckRegistry, Addon };
+export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, VFile, VDirectory, VOS };
