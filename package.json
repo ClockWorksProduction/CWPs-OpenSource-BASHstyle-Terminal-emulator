@@ -1,6 +1,6 @@
 {
   "name": "@clockworksproduction-studio/cwp-open-terminal-emulator",
-  "version": "5.1.4",
+  "version": "5.1.5",
   "description": "A modular, BASH-style terminal emulator library for the web.",
   "type": "module",
   "main": "src/index.js",
@@ -23,7 +23,7 @@
     "CODE_OF_CONDUCT.md"
   ],
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "postinstall": "node bin/cwp-terminal-setup.cjs"
   },
   "repository": {

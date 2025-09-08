@@ -517,9 +517,10 @@ class TerminalUI {
     const element = document.createElement('div');
     element.innerHTML = text;
     this.output.appendChild(element);
-    // Auto-scroll to the bottom
-    this.container.scrollTop = this.container.scrollHeight;
-  }
+  
+    // ✅ scroll the output div
+    this.output.scrollTop = this.output.scrollHeight;
+  }  
 
   setPrompt(promptText) { this.prompt.innerHTML = promptText; }
   registerCtrlC(handler) { this._ctrlCHandler = handle; }
