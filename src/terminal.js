@@ -1,5 +1,5 @@
 // ==========================
-// CentralTerminal v5.0.1 — Client-only, BASH-like web terminal emulator
+// CentralTerminal v5.1.0 — Client-only, BASH-like web terminal emulator
 // - POSIX pathing throughout
 // - Better realism: timestamps, overwrite flags, unixy errors
 // - Interactivity: autocomplete, history nav, Ctrl+C, prompt
@@ -228,8 +228,89 @@ class BootCheckRegistry {
   }
 }
 
-// ---------- Addons ----------
-class Addon{ constructor(name){ this.name=name; this.term=null; } init(term){ this.term=term; } }
+// ---------- Addon System ----------
+class Addon {
+    constructor(name) {
+        if (!name) throw new Error("Addon must have a name.");
+        this.name = name;
+        this.term = null;
+        this.vOS = null;
+    }
+
+    _init(term, vOS) {
+        this.term = term;
+        this.vOS = vOS;
+    }
+
+    // Main entry point. Called when the addon is started.
+    onStart(args) {
+        this.term.print(`Addon '${this.name}' started.`);
+        this.exit();
+    }
+
+    // Called for each line of user input while the addon is active.
+    onCommand(input) {
+        if (input.toLowerCase() === 'exit') this.exit();
+    }
+
+    // Called when the addon is stopped.
+    onStop() {
+        // Optional cleanup logic
+    }
+
+    // Helper for the addon to signal it has finished.
+    exit() {
+        if (this.term && this.term.addonExecutor.activeAddon === this) {
+            this.term.addonExecutor.stop();
+        }
+    }
+}
+
+class AddonExecutor {
+    constructor(term, vOS) {
+        this.term = term;
+        this.vOS = vOS;
+        this.registered = {};
+        this.activeAddon = null;
+    }
+
+    register(addonInstance) {
+        if (!(addonInstance instanceof Addon)) {
+            console.error("Attempted to register invalid addon.", addonInstance);
+            return;
+        }
+        addonInstance._init(this.term, this.vOS);
+        this.registered[addonInstance.name] = addonInstance;
+    }
+
+    start(name, args) {
+        const addon = this.registered[name];
+        if (!addon) {
+            this.term._print(`bash: ${name}: addon not found`);
+            return;
+        }
+        this.activeAddon = addon;
+        this.activeAddon.onStart(args);
+    }
+
+    stop() {
+        if (!this.activeAddon) return;
+        this.activeAddon.onStop();
+        this.activeAddon = null;
+    }
+
+    handleCommand(input) {
+        if (this.activeAddon) {
+            this.activeAddon.onCommand(input);
+            return true; // Input was handled by an addon
+        }
+        return false; // No active addon
+    }
+
+    isActive() {
+        return !!this.activeAddon;
+    }
+}
 
 // ---------- Central Terminal ----------
 class CentralTerminal {
@@ -242,7 +323,7 @@ class CentralTerminal {
     this.commands={};
     this.editor={isActive:false,_buffer:'',lines:[],filePath:null,dirty:false};
     this.rps={isActive:false,player:0,cpu:0,rounds:0};
-    this.addons={active:false,handle:null};
+    this.addonExecutor = new AddonExecutor(this, this.vOS);
     this.commandHistory = [];
     this.bootRegistry=new BootCheckRegistry();
     this._registerDefaultCommands();
@@ -255,6 +336,10 @@ class CentralTerminal {
   prompt(){ return '$'; }
   _saveHistory(){ localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
   _saveState(){ localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
+
+  registerAddon(addonInstance) {
+    this.addonExecutor.register(addonInstance);
+  }
 
   addCommand(cmd){ this.commands[cmd.name]=cmd; }
 
@@ -282,9 +367,6 @@ class CentralTerminal {
       return;
     }
 
-    // addon active
-    if(this.addons.active) { this.addons.handle(input); return; }
-
     // parse command
     const parts = input.match(/(?:[^\s\"]+|\"[^\"]*\")+/g) || [];
     const name = (parts.shift()||'').replace(/\"/g,'').toLowerCase();
@@ -292,6 +374,15 @@ class CentralTerminal {
     const cmd = this.commands[name];
     if (!cmd) { this._print(`bash: ${name}: command not found`); return; }
     cmd.execute(args, this);
+
+    
+    // addon active
+    if (name === 'run') {
+      const addonName = args[0];
+      const addonArgs = args.slice(1);
+      this.addonExecutor.start(addonName, addonArgs);
+      return;
+    }
   }
 
   // ---------- Default Commands ----------
