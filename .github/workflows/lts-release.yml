@@ -2,48 +2,37 @@ name: LTS Release
 
 on:
   workflow_dispatch:
+    inputs:
+      commit_ref:
+        description: 'The branch, tag, or commit SHA to release from (e.g., release/v5).'
+        required: true
+        default: 'main'
 
 jobs:
-  release-lts:
+  release:
     name: Create LTS Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org/'
+          ref: ${{ github.event.inputs.commit_ref }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Get package version
+        id: get_version
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
 
-      - name: Run tests
-        run: npm test
+      - name: Get date
+        id: get_date
+        run: echo "date=$(date +'%Y%m')" >> $GITHUB_OUTPUT
 
-      - name: Prepare LTS version string
-        id: prep_version
-        run: |
-          BASE_VERSION=$(jq -r .version package.json)
-          LTS_SUFFIX=$(date +%Y%m)
-          FULL_VERSION="${BASE_VERSION}-lts.${LTS_SUFFIX}"
-          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Update package.json for publishing
-        run: npm version ${{ steps.prep_version.outputs.version }} --no-git-tag-version --allow-same-version
-
-      - name: Publish to npm under LTS tag
-        run: npm publish --tag lts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create GitHub Pre-release for LTS
+      - name: Create LTS Release
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: v${{ steps.prep_version.outputs.version }}
-          name: Release ${{ steps.prep_version.outputs.version }}
-          body: "This is a Long-Term Support (LTS) pre-release."
+          generateReleaseNotes: true
           prerelease: true
+          tag: "v${{ steps.get_version.outputs.version }}-lts.${{ steps.get_date.outputs.date }}"
+          releaseName: "v${{ steps.get_version.outputs.version }}-lts.${{ steps.get_date.outputs.date }}"

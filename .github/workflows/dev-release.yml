@@ -6,34 +6,24 @@ on:
       - main
 
 jobs:
-  release-dev:
+  prerelease:
     name: Create Dev Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Get package version
+        id: get_version
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
+      - name: Create Prerelease
+        uses: ncipollo/release-action@v1
         with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org/'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prepare dev version string
-        id: prep_version
-        run: |
-          BASE_VERSION=$(jq -r .version package.json)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          FULL_VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
-          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Update package.json for publishing
-        run: npm version ${{ steps.prep_version.outputs.version }} --no-git-tag-version
-
-      - name: Publish to npm under dev tag
-        run: npm publish --tag dev
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          generateReleaseNotes: true
+          prerelease: true
+          tag: "v${{ steps.get_version.outputs.version }}-dev.${{ github.sha }}"
+          releaseName: "v${{ steps.get_version.outputs.version }}-dev.${{ github.sha }}"
