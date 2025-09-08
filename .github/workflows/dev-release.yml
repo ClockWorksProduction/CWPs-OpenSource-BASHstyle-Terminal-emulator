@@ -6,24 +6,38 @@ on:
       - main
 
 jobs:
-  prerelease:
-    name: Create Dev Release
+  publish:
+    name: Publish Dev Build to npm
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read # Only read permission is needed now
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get package version
-        id: get_version
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
-
-      - name: Create Prerelease
-        uses: ncipollo/release-action@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          generateReleaseNotes: true
-          prerelease: true
-          tag: "v${{ steps.get_version.outputs.version }}-dev.${{ github.sha }}"
-          releaseName: "v${{ steps.get_version.outputs.version }}-dev.${{ github.sha }}"
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Get package version and short git SHA
+        id: vars
+        run: |
+          echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Set dev version
+        id: dev_version
+        run: echo "version=${{ steps.vars.outputs.version }}-dev.${{ steps.vars.outputs.sha_short }}" >> $GITHUB_OUTPUT
+
+      - name: Update package.json version
+        run: npm version ${{ steps.dev_version.outputs.version }} --no-git-tag-version
+
+      - name: Publish to npm
+        run: npm publish --tag dev
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
