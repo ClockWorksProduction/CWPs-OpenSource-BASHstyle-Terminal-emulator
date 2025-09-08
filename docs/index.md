@@ -11,3 +11,7 @@ This documentation will guide you through the installation, configuration, and u
 *   [Default Commands](./commands.md)
 *   [Addon System](./addons.md)
 *   [Virtual File System](./filesystem.md)
+*   [Release System](./release-system.md)
+*   [Troubleshooting](./troubleshooting.md)
+*   [Contributing Guidelines](../CONTRIBUTING.md)
+*   [Changelog](../CHANGELOG.md)

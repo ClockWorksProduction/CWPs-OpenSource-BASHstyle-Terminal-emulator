@@ -16,6 +16,7 @@
     "src",
     "addons",
     "bin",
+    "docs",
     "LICENSE",
     "README.md",
     "CONTRIBUTING.md",
@@ -43,6 +44,7 @@
     "url": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator/issues"
   },
   "homepage": "https://github.com/ClockWorksProduction/CWPs-OpenSource-BASHstyle-Terminal-emulator#readme",
+  "documentation": "docs/index.md",
   "publishConfig": {
     "access": "public"
   },

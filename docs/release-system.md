@@ -7,7 +7,7 @@ This document outlines the automated release system for the CWP Open Terminal Em
 Our project utilizes a four-tier release system:
 
 1.  **Dev Release (`@dev`)**: The most unstable, bleeding-edge version. A new version is published with every single commit to the `main` branch.
-2.  **Nightly Release (`@nightly`)**: A more stable pre-release version, published bi-weekly. This is ideal for developers who want to test upcoming features without being on the commit-by-commit bleeding edge.
+2.  **Nightly Release (`@nightly`)**: A stable pre-release version, published bi-weekly. This is ideal for developers who want to test upcoming features without being on the commit-by-commit bleeding edge.
 3.  **Stable Release (`@latest`)**: The official, production-ready version. This is the default release for most users.
 4.  **Long-Term Support (`@lts`)**: A specific major version line that only receives critical bug fixes, providing maximum stability for large or legacy projects.
 
@@ -29,7 +29,7 @@ This workflow ensures that the absolute latest code from the `main` branch is al
 *   **Tag on npm**: `@dev`
 *   **Trigger**: Runs automatically on every `git push` to the `main` branch.
 *   **Workflow file**: `.github/workflows/dev-release.yml`
-*   **Versioning**: Generates a unique version by combining the latest version with the commit hash (e.g., `4.0.7-dev.a1b2c3d`).
+*   **Versioning**: Generates a unique version by combining the latest version with the commit hash (e.g., `5.0.1-dev.a1b2c3d`).
 
 ### Installing the Dev Version
 
@@ -46,7 +46,7 @@ This workflow provides a regularly scheduled, more stable pre-release for testin
 *   **Tag on npm**: `@nightly`
 *   **Trigger**: Runs on a schedule (bi-weekly at 03:00 UTC on the 1st and 15th of the month). It can also be triggered manually.
 *   **Workflow file**: `.github/workflows/nightly-release.yml`
-*   **Versioning**: Creates a pre-release version, like `4.1.0-nightly.0`.
+*   **Versioning**: Appends the release date to the current version (e.g., `5.0.1-nightly.20250905`). This provides a clear timestamp without incrementing the package version.
 
 ### Installing the Nightly Version
 
@@ -63,7 +63,7 @@ This workflow provides a controlled process for publishing official, stable rele
 *   **Tag on npm**: `@latest`
 *   **Trigger**: Must be run manually from the repository's "Actions" tab against the `main` branch.
 *   **Workflow file**: `.github/workflows/release.yml`
-*   **Versioning**: Asks for a `patch`, `minor`, or `major` bump. It then automatically increments the version and creates a Git tag (e.g., `v4.1.0`).
+*   **Versioning**: Asks for a `patch`, `minor`, or `major` bump. It then automatically increments the version and creates a Git tag (e.g., `v5.0.1`).
 
 ---
 

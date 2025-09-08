@@ -12,21 +12,17 @@ The `CentralTerminal` class is the main entry point for creating and managing th
 
 Creates a new terminal instance. The container element must exist in the DOM before the terminal is initialized.
 
-### `boot()`
+### `bootCheckRegistry`
 
-Starts the terminal boot sequence. This will run any registered boot checks and, if successful, display the terminal interface.
+A `BootCheckRegistry` instance that manages the boot checks.
 
-### `addCommand(command)`
+### `commandRegistry`
 
-*   `command` (Command): An instance of the `Command` class.
+A `CommandRegistry` instance that manages the terminal commands.
 
-Registers a new command with the terminal. The command will be available to the user in the terminal interface.
+### `addonExecutor`
 
-### `registerAddon(addon)`
-
-*   `addon` (Addon): An instance of an `Addon` class.
-
-Registers a new addon with the terminal. Addons can be started using the `run` command.
+An `AddonExecutor` instance that manages the addons.
 
 ### `print(text)`
 
@@ -44,6 +40,29 @@ Prints a raw HTML string to the terminal output. This can be used for rendering 
 
 Clears the terminal output.
 
+## `BootCheck`
+
+The `BootCheck` class is used to create new boot checks.
+
+### `constructor(description, checkFunction)`
+
+*   `description` (String): A brief description of the boot check.
+*   `checkFunction` (Function): A function that returns a promise that resolves to `true` if the check is successful, and `false` otherwise.
+
+## `BootCheckRegistry`
+
+### `addCheck(check)`
+
+*   `check` (BootCheck): An instance of the `BootCheck` class.
+
+Registers a new boot check with the terminal.
+
+### `runChecks(term)`
+
+*   `term` (CentralTerminal): The `CentralTerminal` instance.
+
+Runs all registered boot checks.
+
 ## `Command`
 
 The `Command` class is used to create new commands for the terminal.
@@ -54,6 +73,14 @@ The `Command` class is used to create new commands for the terminal.
 *   `description` (String): A brief description of the command.
 *   `execute` (Function): The function to execute when the command is run. The function will receive an array of arguments as its only parameter.
 *   `aliases` (Array): An optional array of alternative names for the command.
+
+## `CommandRegistry`
+
+### `register(command)`
+
+*   `command` (Command): An instance of the `Command` class.
+
+Registers a new command with the terminal.
 
 ## `Addon`
 
@@ -80,3 +107,11 @@ This method is called for every command the user enters while the addon is activ
 ### `onStop()`
 
 This method is called when the addon is stopped (e.g., when the user runs the `exit` command).
+
+## `AddonExecutor`
+
+### `registerAddon(addon)`
+
+*   `addon` (Addon): An instance of an `Addon` class.
+
+Registers a new addon with the terminal.

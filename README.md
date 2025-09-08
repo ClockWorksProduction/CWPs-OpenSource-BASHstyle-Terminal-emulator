@@ -7,47 +7,39 @@ A modular, BASH-style terminal emulator library for the web. CWP Open Terminal E
 
 ## Features
 
-- **BASH-like Environment:** Familiar commands like `ls`, `cd`, `cat`, `mkdir`, `pwd`, `rm`, `echo`, and `history`.
-- **Virtual File System:** An in-memory file system to simulate file and directory operations.
-- **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
-- **Lightweight Core:** The core terminal is minimal, allowing you to add only the features you need.
-- **Official Addons:** A collection of optional, pre-built modules (addons) that add extra features like a package manager, text editor, and system monitoring tools.
+*   **BASH-like Environment:** Familiar commands like `ls`, `cd`, `cat`, `mkdir`, `pwd`, `rm`, `echo`, and `history`.
+*   **Virtual File System:** An in-memory file system to simulate file and directory operations.
+*   **Extensible Addon System:** Create your own commands and applications that run inside the terminal.
+*   **Lightweight Core:** The core terminal is minimal, allowing you to add only the features you need.
+*   **Official Addons:** A collection of optional, pre-built modules (addons) that add extra features like a package manager, text editor, and system monitoring tools.
+*   **Flexible Release System:** A four-tier release system, allowing you to choose the stability level that best suits your needs.
 
 ## Installation
 
-This project uses a four-tier release system, allowing you to choose the stability level that best suits your needs.
+This project uses a four-tier release system. Choose the stability level that best suits your needs:
 
-### Stable Version (`@latest`)
-This is the recommended version for most users. It is the official, production-ready release.
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@latest
-```
+*   **Stable (`@latest`):** Recommended for most users.
+    ```bash
+    npm install @clockworksproduction-studio/cwp-open-terminal-emulator@latest
+    ```
+*   **Long-Term Support (`@lts`):** For critical bug fixes on a previous major version.
+    ```bash
+    npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
+    ```
+*   **Nightly (`@nightly`):** Bi-weekly pre-releases for testing upcoming features.
+    ```bash
+    npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
+    ```
+*   **Dev (`@dev`):** Bleeding-edge versions, published with every commit.
+    ```bash
+    npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
+    ```
 
-### Long-Term Support (`@lts`)
-This channel provides critical bug fixes for a previous major version, offering maximum stability for large or legacy projects.
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
-```
+## Usage
 
-### Nightly Version (`@nightly`)
-A bi-weekly pre-release for developers who want to test upcoming features.
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
-```
+Here's a complete example of how to set up and use the terminal:
 
-### Dev Version (`@dev`)
-The bleeding-edge version, published with every single commit to the `main` branch. Not recommended for production.
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
-```
-
-## Live Demo & Example
-
-Below is a complete, runnable example of how to set up and use the terminal.
-
-### 1. The HTML
-
-First, create an `index.html` file. This will serve as the entry point for your application. It contains a "BIOS" screen that shows boot checks and the main terminal container, which is initially hidden.
+### 1. HTML (`index.html`)
 
 ```html
 <!DOCTYPE html>
@@ -59,7 +51,6 @@ First, create an `index.html` file. This will serve as the entry point for your 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- BIOS Boot Screen (visible on start) -->
     <div id="bios-screen">
         <div id="bios-output"></div>
         <div id="bios-footer">
@@ -67,8 +58,6 @@ First, create an `index.html` file. This will serve as the entry point for your 
             <p>Initializing...</p>
         </div>
     </div>
-
-    <!-- Main Terminal (initially hidden) -->
     <div id="central-terminal-container" style="display: none;">
         <div id="terminal-ui">
             <div id="terminal-output-panel">
@@ -80,34 +69,18 @@ First, create an `index.html` file. This will serve as the entry point for your 
             </div>
         </div>
     </div>
-
-    <!-- Load the application script as a module -->
     <script type="module" src="app.js"></script>
 </body>
 </html>
 ```
 
-### 2. The JavaScript
-
-Next, create an `app.js` file. This is where you will import the terminal, register addons, and boot the system.
+### 2. JavaScript (`app.js`)
 
 ```javascript
 import { CentralTerminal, BootCheck } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
-// Note: When using addons, adjust the import path based on your project structure.
-// For example: import { register as registerRPS } from './node_modules/@clockworksproduction-studio/cwp-open-terminal-emulator/addons/rps_addon.js';
 
-// --- 1. Initialize the Terminal ---
 const term = new CentralTerminal('#central-terminal-container');
 
-// --- 2. Register Official Addons (Optional) ---
-// Addons are optional modules that add extra features.
-// To use them, you would first need to import them, e.g.:
-// import { register as registerRPS } from './addons/rps_addon.js';
-// registerRPS(term.addonExecutor);
-
-
-// --- 3. Define Boot Checks ---
-// These checks run before the terminal is ready.
 const checkSystemFiles = new BootCheck(
     'Checking system files',
     () => new Promise(resolve => setTimeout(() => resolve(true), 500))
@@ -118,41 +91,25 @@ const checkHardware = new BootCheck(
     () => new Promise(resolve => setTimeout(() => resolve(true), 500))
 );
 
-const checkNetwork = new BootCheck(
-    'Establishing network connection',
-    () => new Promise(resolve => setTimeout(() => resolve(false), 500)), // This one will fail for demo purposes
-    'Network connection failed, continuing in offline mode.'
-);
-
-// --- 4. Boot the Terminal ---
 async function startTerminal() {
     const bootManager = term.bootCheckRegistry;
     bootManager.addCheck(checkSystemFiles);
     bootManager.addCheck(checkHardware);
-    bootManager.addCheck(checkNetwork);
 
-    const allSystemsGo = await bootManager.runChecks(term);
+    await bootManager.runChecks(term);
 
-    // Hide BIOS, show terminal
     document.getElementById('bios-screen').style.display = 'none';
     document.getElementById('central-terminal-container').style.display = 'block';
 
-    if (allSystemsGo) {
-        term.print('All systems go! Welcome to the terminal.');
-    } else {
-        term.print('Boot process encountered non-critical errors. System is online.');
-    }
+    term.print('Welcome to the terminal.');
 }
 
 startTerminal();
 ```
 
-### 3. (Optional) The CSS
-
-For styling, you can create a `style.css` file:
+### 3. CSS (`style.css`)
 
 ```css
-/* Add your own styles here */
 body {
     background-color: #000;
     color: #0f0;
@@ -180,14 +137,19 @@ body {
 
 ## Documentation
 
-- [Addon System](docs/addons.md)
-- [Troubleshooting and FAQ](docs/troubleshooting.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
+For more detailed information, please see the [official documentation](docs/index.md).
+
+*   [Getting Started](docs/getting-started.md)
+*   [API Reference](docs/api-reference.md)
+*   [Default Commands](docs/commands.md)
+*   [Addon System](docs/addons.md)
+*   [Virtual File System](docs/filesystem.md)
+*   [Release System](docs/release-system.md)
+*   [Troubleshooting](docs/troubleshooting.md)
 
 ## Contributing
 
-We welcome contributions from the community! This project follows an automated release system managed by GitHub Actions. Please read our **[Contributing Guidelines](CONTRIBUTING.md)** for more details on the development process.
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details on the development process and our automated release system.
 
 ## License
 
