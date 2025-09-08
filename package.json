@@ -23,7 +23,8 @@
     "CODE_OF_CONDUCT.md"
   ],
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "node bin/cwp-terminal-setup.cjs"
   },
   "repository": {
     "type": "git",
