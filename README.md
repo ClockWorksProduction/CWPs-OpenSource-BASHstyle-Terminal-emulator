@@ -4,6 +4,19 @@ CWP Open Terminal Emulator is a versatile, embeddable, and highly extensible ter
 
 ![Terminal Screenshot](https://i.imgur.com/L5a2j8J.png)
 
+## Release Channels
+
+This project uses a four-tier release system to provide versions for every need, from bleeding-edge development builds to stable long-term support. You can install any channel via npm.
+
+| Channel | npm Tag | Source Branch | Trigger | Current Version |
+|---|---|---|---|---|
+| **Dev** | `@dev` | `main` | Every push | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg) |
+| **Nightly** | `@nightly`| `main` | Bi-weekly schedule | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg) |
+| **Stable** | `@latest` | `main` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg) |
+| **LTS** | `@lts` | `release/vX` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
+
+For more detailed information, see the **[Release & Publishing Guide](docs/release-system.md)**.
+
 ## Features
 
 - **Extensive Command Library:** Over 40 familiar commands, including `ls`, `cd`, `cat`, `mkdir`, `grep`, `tree`, and more.
@@ -45,6 +58,7 @@ term.boot();
 
 - **[Changelog](docs/CHANGELOG.md):** See the full history of changes.
 - **[Addon Architecture](docs/addons.md):** A detailed guide on creating and registering your own addons.
+- **[Release System](docs/release-system.md):** A guide to the different release channels.
 
 ## Contributing
 
