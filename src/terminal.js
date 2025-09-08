@@ -448,47 +448,46 @@ class AddonExecutor {
 
 // ---------- Terminal UI Handler ----------
 class TerminalUI {
-  // onCommand(command) : function to call on Enter
-  // onAutocomplete() : function to call on Tab
-  
-  constructor(containerSelector, onCommand, onAutocomplete = null) {
+  constructor(containerSelector, onCommand, onAutocomplete = null, options = {}) {
     const container = document.querySelector(containerSelector);
     if (!container) throw new Error(`Terminal container element not found: ${containerSelector}`);
 
     this.container = container;
-    this.container.style.fontFamily = 'monospace';
-    this.container.style.backgroundColor = 'black';
-    this.container.style.color = '#eee';
-    this.container.style.padding = '5px';
-    this.container.innerHTML = '';
-
     this.onCommand = onCommand;
     this.onAutocomplete = onAutocomplete;
     this._ctrlCHandler = null;
 
-    // 1. Create output area
-    this.output = document.createElement('div');
+    // Check for mapped DOM elements
+    this.output  = options.outputSelector ? document.querySelector(options.outputSelector) : null;
+    this.prompt  = options.promptSelector ? document.querySelector(options.promptSelector) : null;
+    this.input   = options.inputSelector  ? document.querySelector(options.inputSelector)  : null;
 
-    // 2. Create input line
-    const inputLine = document.createElement('div');
-    this.prompt = document.createElement('span');
-    this.input = document.createElement('input');
-    this.input.type = 'text';
-    this.input.style.background = 'transparent';
-    this.input.style.border = 'none';
-    this.input.style.color = 'inherit';
-    this.input.style.fontFamily = 'inherit';
-    this.input.style.width = '80%';
-    this.input.setAttribute('autofocus', 'true');
+    // If no custom elements were provided, fall back to auto-generation
+    if (!this.output || !this.prompt || !this.input) {
+      this.container.innerHTML = '';
+      this.container.style.fontFamily = 'monospace';
+      this.container.style.backgroundColor = 'black';
+      this.container.style.color = '#eee';
+      this.container.style.padding = '5px';
 
-    inputLine.appendChild(this.prompt);
-    inputLine.appendChild(this.input);
+      this.output = document.createElement('div');
+      const inputLine = document.createElement('div');
+      this.prompt = document.createElement('span');
+      this.input = document.createElement('input');
+      this.input.type = 'text';
+      this.input.style.background = 'transparent';
+      this.input.style.border = 'none';
+      this.input.style.color = 'inherit';
+      this.input.style.fontFamily = 'inherit';
+      this.input.style.width = '80%';
 
-    // 3. Add to container
-    this.container.appendChild(this.output);
-    this.container.appendChild(inputLine);
+      inputLine.appendChild(this.prompt);
+      inputLine.appendChild(this.input);
+      this.container.appendChild(this.output);
+      this.container.appendChild(inputLine);
+    }
 
-    // 4. Wire up the command handler
+    // Bind key events
     this.input.addEventListener('keydown', (e) => {
       // Ctrl+C handling
       if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
@@ -523,10 +522,8 @@ class TerminalUI {
   }
 
   setPrompt(promptText) { this.prompt.innerHTML = promptText; }
-
-  registerCtrlC(handler) { this._ctrlCHandler = handler; }
-}
-
+  registerCtrlC(handler) { this._ctrlCHandler = handle; }
+  }
 // ---------- Central Terminal ----------
 class CentralTerminal {
   constructor(containerOrUI) {

@@ -4,6 +4,15 @@ This document provides a detailed reference for all the default commands availab
 
 ---
 
+### `aafire`
+
+Displays an ASCII fire animation.
+
+*   **Usage**: `aafire`
+*   **Details**: Runs a continuous animation. Press `Ctrl+C` to stop.
+
+---
+
 ### `cat`
 
 Displays the contents of a file.
@@ -33,6 +42,42 @@ Changes the current working directory.
 
 ---
 
+### `chmod`
+
+Simulates changing file permissions. This is a mock command.
+
+*   **Usage**: `chmod [permissions] [file]`
+*   **Example**:
+    ```bash
+    chmod 755 my_script.sh
+    ```
+
+---
+
+### `chown`
+
+Simulates changing file ownership. This is a mock command.
+
+*   **Usage**: `chown [user] [file]`
+*   **Example**:
+    ```bash
+    chown new_owner my_file.txt
+    ```
+
+---
+
+### `chgrp`
+
+Simulates changing file group. This is a mock command.
+
+*   **Usage**: `chgrp [group] [file]`
+*   **Example**:
+    ```bash
+    chgrp new_group my_file.txt
+    ```
+
+---
+
 ### `clear`
 
 Clears all previous output from the terminal screen.
@@ -41,12 +86,60 @@ Clears all previous output from the terminal screen.
 
 ---
 
+### `cmatrix`
+
+Displays a Matrix-style falling text animation.
+
+*   **Usage**: `cmatrix`
+*   **Details**: Runs a continuous animation. Press `Ctrl+C` to stop.
+
+---
+
+### `cp`
+
+Copies a file from a source to a destination.
+
+*   **Usage**: `cp [source_file] [destination_file]`
+*   **Example**:
+    ```bash
+    cp /docs/guide.txt /home/user/guide-copy.txt
+    ```
+
+---
+
+### `curl`
+
+Simulates fetching a URL. This is a mock command.
+
+*   **Usage**: `curl [url]`
+*   **Example**:
+    ```bash
+    curl https://example.com
+    ```
+
+---
+
 ### `date`
 
 Displays the current system date and time.
 
-*   **Alias**: `time`
 *   **Usage**: `date`
+
+---
+
+### `df`
+
+Simulates displaying disk usage.
+
+*   **Usage**: `df`
+
+---
+
+### `du`
+
+Simulates displaying directory usage.
+
+*   **Usage**: `du [directory]`
 
 ---
 
@@ -62,11 +155,66 @@ Prints text to the terminal.
 
 ---
 
+### `edit`
+
+Starts the text editor addon to edit a file.
+
+*   **Alias**: `vim`
+*   **Usage**: `edit [file_path]`
+*   **Example**:
+    ```bash
+    edit my_document.txt
+    ```
+
+---
+
 ### `exit`
 
 Exits the currently running addon and returns to the main terminal prompt. This command has no effect in the main terminal.
 
 *   **Usage**: `exit`
+
+---
+
+### `find`
+
+Simulates finding files. This is a mock command.
+
+*   **Usage**: `find [path] -name [pattern]`
+
+---
+
+### `free`
+
+Simulates displaying memory information.
+
+*   **Usage**: `free`
+
+---
+
+### `grep`
+
+Searches for a pattern within a file.
+
+*   **Usage**: `grep [pattern] [file]`
+*   **Example**:
+    ```bash
+    grep "hello" /docs/guide.txt
+    ```
+
+---
+
+### `head`
+
+Displays the first few lines of a file.
+
+*   **Usage**: `head [file] [lines]`
+*   **Default**: Shows the first 10 lines.
+*   **Example**:
+    ```bash
+    # Show the first 5 lines of a file
+    head /docs/guide.txt 5
+    ```
 
 ---
 
@@ -83,15 +231,22 @@ Lists all available commands.
 Displays a list of previously executed commands.
 
 *   **Usage**: `history`
-*   **Details**: You can re-run a command from the history list using its number with an exclamation mark.
-*   **Example**:
-    ```bash
-    # Display command history
-    history
 
-    # If 'ls -l' was command number 5, this will re-run it
-    !5
-    ```
+---
+
+### `kill`
+
+Simulates killing a process. This is a mock command.
+
+*   **Usage**: `kill [pid]`
+
+---
+
+### `ln`
+
+Simulates creating a symbolic link. This is a mock command.
+
+*   **Usage**: `ln -s [target] [link_name]`
 
 ---
 
@@ -99,31 +254,76 @@ Displays a list of previously executed commands.
 
 Lists the files and directories in the current directory or a specified path.
 
-*   **Usage**: `ls [options] [path]`
-*   **Details**: Accepts standard flags like `-l` for a long list format and `-a` to show hidden files.
-*   **Examples**:
+*   **Usage**: `ls [path]`
+*   **Example**:
     ```bash
-    # List contents of the current directory
-    ls
-
-    # List contents of a different directory
     ls /etc
-
-    # Use long list format
-    ls -l
     ```
 
 ---
 
 ### `mkdir`
 
-Creates a new directory.
+Creates a new directory. Supports the `-p` flag to create parent directories recursively.
 
-*   **Usage**: `mkdir [directory_name]`
+*   **Usage**: `mkdir [-p] [directory_name]`
 *   **Example**:
     ```bash
-    mkdir my-new-project
+    mkdir my-project
+    mkdir -p my/nested/project
     ```
+
+---
+
+### `mv`
+
+Moves or renames a file.
+
+*   **Usage**: `mv [source] [destination]`
+*   **Example**:
+    ```bash
+    # Rename a file
+    mv old.txt new.txt
+
+    # Move a file to a new directory
+    mv new.txt /docs
+    ```
+
+---
+
+### `pgrep`
+
+Simulates finding a process by name. This is a mock command.
+
+*   **Usage**: `pgrep [process_name]`
+
+---
+
+### `ping`
+
+Simulates sending a ping to a host.
+
+*   **Usage**: `ping [host]`
+*   **Example**:
+    ```bash
+    ping example.com
+    ```
+
+---
+
+### `pkill`
+
+Simulates killing a process by name. This is a mock command.
+
+*   **Usage**: `pkill [process_name]`
+
+---
+
+### `ps`
+
+Simulates listing active processes.
+
+*   **Usage**: `ps`
 
 ---
 
@@ -147,17 +347,57 @@ Deletes a file. This action is permanent.
 
 ---
 
+### `rmdir`
+
+Deletes an empty directory.
+
+*   **Usage**: `rmdir [directory]`
+*   **Example**:
+    ```bash
+    rmdir my-empty-folder
+    ```
+
+---
+
+### `rps`
+
+Starts the Rock, Paper, Scissors game addon.
+
+*   **Usage**: `rps`
+
+---
+
 ### `run`
 
 Starts a registered addon.
 
 *   **Usage**: `run [addon_command] [args...]`
-*   **Details**: This command is used to launch addons. Any arguments passed after the addon command will be sent to the addon itself.
 *   **Example**:
     ```bash
-    # Start the text editor addon to create a new file
     run edit my_document.txt
     ```
+
+---
+
+### `tail`
+
+Displays the last few lines of a file.
+
+*   **Usage**: `tail [file] [lines]`
+*   **Default**: Shows the last 10 lines.
+*   **Example**:
+    ```bash
+    # Show the last 5 lines of a file
+    tail /docs/guide.txt 5
+    ```
+
+---
+
+### `top`
+
+Simulates a process monitor. This is a mock command.
+
+*   **Usage**: `top`
 
 ---
 
@@ -177,4 +417,36 @@ Creates a new, empty file.
 
 Displays the directory structure as a tree.
 
-*   **Usage**: `tree`
+*   **Usage**: `tree [path]`
+
+---
+
+### `umask`
+
+Simulates showing the umask value.
+
+*   **Usage**: `umask`
+
+---
+
+### `uname`
+
+Displays system information.
+
+*   **Usage**: `uname`
+
+---
+
+### `uptime`
+
+Simulates showing the system uptime.
+
+*   **Usage**: `uptime`
+
+---
+
+### `whoami`
+
+Displays the current user.
+
+*   **Usage**: `whoami`

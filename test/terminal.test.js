@@ -1,7 +1,16 @@
 // test/terminal.test.js
-// Comprehensive test suite for CentralTerminal v5.1.0
+// Comprehensive test suite for CentralTerminal v5.1.3
 
-const { CentralTerminal, EditorAddon, RpsAddon } = require('../src/terminal');
+const {
+  CentralTerminal,
+  VOS,
+  VFile,
+  VDirectory,
+  Addon,
+  EditorAddon,
+  RpsAddon,
+  TerminalUI
+} = require('../src/terminal');
 
 // --- Mock UI ---
 const mockUI = () => ({
@@ -9,6 +18,223 @@ const mockUI = () => ({
   clearTerminal: jest.fn(),
   registerCtrlC: jest.fn(),
   setPrompt: jest.fn(),
+  input: {
+    value: ''
+  }, // Add input for autocomplete tests
+});
+
+// --- Mock localStorage ---
+const mockLocalStorage = (() => {
+  let store = {};
+  return {
+    getItem: key => store[key] || null,
+    setItem: (key, value) => {
+      store[key] = value.toString();
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage
+});
+
+
+describe('VOS (Virtual Operating System)', () => {
+  let vos;
+  beforeEach(() => {
+    vos = new VOS();
+  });
+
+  test('should initialize with a home directory', () => {
+    expect(vos.cwd).toBeDefined();
+    expect(vos.pathOf(vos.cwd)).toBe('/home/user');
+  });
+
+  test('normalize should handle complex paths', () => {
+    vos.chdir('/home');
+    expect(vos.normalize('..')).toBe('/');
+    expect(vos.normalize('./user/../user/./test')).toBe('/home/user/test');
+    expect(vos.normalize('~/documents')).toBe('/home/user/documents');
+    expect(vos.normalize('/a//b/../c')).toBe('/a/c');
+  });
+
+  test('mkdir and rmdir should manage directories', () => {
+    expect(vos.mkdir('/home/user/test-dir')).toBe(true);
+    const dir = vos.resolve('/home/user/test-dir');
+    expect(dir).toBeInstanceOf(VDirectory);
+    expect(vos.rmdir('/home/user/test-dir')).toBe(true);
+    expect(vos.resolve('/home/user/test-dir')).toBeNull();
+  });
+
+  test('rmdir should fail on a non-empty directory', () => {
+    vos.mkdir('/test-non-empty');
+    vos.writeFile('/test-non-empty/file.txt', 'content');
+    expect(vos.rmdir('/test-non-empty')).toBe(false);
+  });
+
+
+  test('writeFile and readFile should manage file content', () => {
+    const path = '/home/user/test.txt';
+    const content = 'hello world';
+    vos.writeFile(path, content);
+    const file = vos.resolve(path);
+    expect(file).toBeInstanceOf(VFile);
+    expect(vos.readFile(path)).toBe(content);
+  });
+
+  test('unlink should remove a file', () => {
+    const path = '/home/user/file-to-delete.txt';
+    vos.writeFile(path, 'delete me');
+    expect(vos.resolve(path)).not.toBeNull();
+    vos.unlink(path);
+    expect(vos.resolve(path)).toBeNull();
+  });
+
+  test('ls should list directory contents', () => {
+    vos.mkdir('/home/user/dir1');
+    vos.writeFile('/home/user/file1.txt', '');
+    const contents = vos.ls('/home/user');
+    expect(contents).toEqual(['dir1/', 'file1.txt']);
+  });
+
+  test('chdir should change the current working directory', () => {
+    vos.mkdir('/new-dir');
+    vos.chdir('/new-dir');
+    expect(vos.pathOf(vos.cwd)).toBe('/new-dir');
+  });
+
+  test('serialization and deserialization should work', () => {
+    vos.writeFile('/a.txt', 'test');
+    const json = vos.toJSON();
+    const newVos = VOS.fromJSON(json);
+    expect(newVos.readFile('/a.txt')).toBe('test');
+    expect(newVos.pathOf(newVos.cwd)).toBe('/home/user');
+  });
+});
+
+
+describe('Addon System', () => {
+  let term;
+  let ui;
+  beforeEach(() => {
+    ui = mockUI();
+    term = new CentralTerminal(ui);
+    term.registerAddon(new EditorAddon());
+    term.registerAddon(new RpsAddon());
+  });
+
+  test('should register addons', () => {
+    expect(term.addonExecutor.registered['edit']).toBeInstanceOf(EditorAddon);
+    expect(term.addonExecutor.registered['rps']).toBeInstanceOf(RpsAddon);
+  });
+
+  test('run command should start an addon', async () => {
+    await term.runCommand('run rps');
+    expect(term.addonExecutor.isActive()).toBe(true);
+    expect(term.addonExecutor.activeAddon.name).toBe('rps');
+    const output = ui.appendTerminalOutput.mock.calls.flat().join('\n');
+    expect(output).toContain('--- Rock, Paper, Scissors ---');
+  });
+
+  test('EditorAddon should edit a file', async () => {
+    await term.runCommand('edit test.txt');
+    expect(term.addonExecutor.activeAddon.name).toBe('edit');
+    await term.runCommand('a new line');
+    await term.runCommand(':wq'); // Save and quit
+    expect(term.vOS.readFile('test.txt')).toBe('a new line');
+    expect(term.addonExecutor.isActive()).toBe(false);
+  });
+
+  test('RpsAddon should play a game', async () => {
+    await term.runCommand('rps');
+    await term.runCommand('rock');
+    const output = ui.appendTerminalOutput.mock.calls.flat().join('\n');
+    expect(output).toMatch(/You: rock \| Computer:/);
+  });
+});
+
+describe('TerminalUI', () => {
+  beforeEach(() => {
+    // Set up a DOM container
+    document.body.innerHTML = '<div id="terminal-container"></div>';
+  });
+
+  test('should auto-generate its DOM elements', () => {
+    const ui = new TerminalUI('#terminal-container', () => {});
+    expect(ui.container.querySelector('input')).not.toBeNull();
+    expect(ui.container.querySelector('span')).not.toBeNull();
+  });
+
+  test('should use provided DOM elements if selectors are given', () => {
+    document.body.innerHTML = `
+      <div id="term-manual">
+        <div class="output"></div>
+        <span class="prompt"></span>
+        <input class="input" type="text" />
+      </div>
+    `;
+    const options = {
+      outputSelector: '.output',
+      promptSelector: '.prompt',
+      inputSelector: '.input',
+    };
+    const ui = new TerminalUI('#term-manual', () => {}, null, options);
+    // Check that it DID NOT create new elements
+    expect(ui.container.querySelectorAll('input').length).toBe(1);
+    expect(ui.input.className).toBe('input');
+  });
+});
+
+
+describe('CentralTerminal Core Functionality', () => {
+  let term;
+  let ui;
+
+  beforeEach(() => {
+    mockLocalStorage.clear();
+    ui = mockUI();
+    term = new CentralTerminal(ui);
+  });
+
+  test('boot should load from localStorage', async () => {
+    const vosState = {
+      root: {
+        kind: 'dir',
+        name: '',
+        children: {
+          'test.txt': {
+            kind: 'file',
+            name: 'test.txt',
+            content: 'saved'
+          }
+        }
+      },
+      cwd: '/',
+      homePath: '/'
+    };
+    mockLocalStorage.setItem('cterm_vos', JSON.stringify(vosState));
+    mockLocalStorage.setItem('cterm_history', JSON.stringify(['ls', 'pwd']));
+
+    await term.boot();
+    expect(term.vOS.readFile('/test.txt')).toBe('saved');
+    expect(term.commandHistory).toEqual(['ls', 'pwd']);
+  });
+
+  test('autocomplete should suggest commands', () => {
+    term.ui.input.value = 'he';
+    term._autoComplete();
+    const output = ui.appendTerminalOutput.mock.calls.flat().join('\n');
+    expect(output).toContain('head');
+    expect(output).toContain('help');
+  });
+
+  test('autocomplete should complete a unique command', () => {
+    term.ui.input.value = 'cle';
+    term._autoComplete();
+    expect(term.ui.input.value).toBe('clear ');
+  });
 });
 
 describe('CentralTerminal Command Suite', () => {

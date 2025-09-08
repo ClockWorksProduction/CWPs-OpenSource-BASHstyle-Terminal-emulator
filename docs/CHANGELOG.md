@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.4] - 2025-09-08
+
+### Fixed
+- **CLI Setup Script:** Corrected a critical bug in the `cwp-terminal-setup` script where it would fail to generate the `app.js` file in `manual` mode.
+
+### Added
+- **CLI Test Suite:** Implemented a comprehensive Jest test suite for the `cwp-terminal-setup` script. The new tests cover the `scaffold`, `refactor`, and `manual` modes to ensure reliability.
+
+### Changed
+- **Documentation:** Rewrote the `SETUP.md` guide to prioritize the new automated setup script and re-framed the previous content as the "Manual Integration" path. Removed the redundant `getting-started.md` and fixed all broken links.
+
 ## [5.1.0] - 2025-09-06
 
 ### Changed

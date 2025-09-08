@@ -1,117 +1,151 @@
 # API Reference
 
-This document provides a detailed reference for the core API of the CWP Open Terminal Emulator library.
+This document provides a detailed reference for the core API of the CWP Open Terminal Emulator, designed for third-party developers looking to integrate, extend, or build upon the library.
+
+---
+
+## Core Architecture
+
+The terminal is composed of several key classes that work together:
+
+1.  **`CentralTerminal`**: The primary, top-level class that orchestrates all operations. It manages commands, addons, and the user session.
+2.  **`TerminalUI`**: A handler that manages all DOM interactions, including input, output, and rendering. It can be automatically generated or mapped to your existing HTML structure.
+3.  **`VOS` (Virtual Operating System)**: An in-memory virtual file system that simulates a POSIX-like environment with files and directories.
+4.  **`AddonExecutor`**: A manager responsible for the lifecycle of addons.
+5.  **`BootCheckRegistry`**: A system that runs diagnostic and setup tasks before the terminal is ready for user input.
 
 ---
 
 ## `CentralTerminal`
 
-The `CentralTerminal` class is the main entry point for creating and managing the terminal.
+The main class that you will instantiate. It binds everything together.
 
-### `constructor(containerId)`
+### `constructor(containerOrUI)`
 
-*   `containerId` (String): The ID of the HTML element that will contain the terminal.
+Creates a new terminal instance. The constructor is flexible:
 
-Creates a new terminal instance. The container element must exist in the DOM before the terminal is initialized.
+*   **Simple Mode**: Pass a CSS selector string (e.g., `'#my-terminal'`). The library will automatically build the required DOM elements inside that container.
 
-### `bootCheckRegistry`
+*   **Advanced Mode**: Pass a `TerminalUI` instance for fine-grained control over the DOM. (See the `TerminalUI` section).
 
-A `BootCheckRegistry` instance that manages the boot checks.
+### Key Properties
 
-### `commandRegistry`
+*   `vOS` (`VOS`): The virtual file system instance. Use this to programmatically interact with the FS.
+*   `addonExecutor` (`AddonExecutor`): The addon manager. Use this to register your custom addons.
+*   `bootRegistry` (`BootCheckRegistry`): The boot sequence manager. Use this to add custom boot checks.
 
-A `CommandRegistry` instance that manages the terminal commands.
+### Methods
 
-### `addonExecutor`
-
-An `AddonExecutor` instance that manages the addons.
-
-### `print(text)`
-
-*   `text` (String): The text to print to the terminal.
-
-Prints a line of text to the terminal output.
-
-### `printHtml(html)`
-
-*   `html` (String): The HTML to render in the terminal.
-
-Prints a raw HTML string to the terminal output. This can be used for rendering images, links, and other rich content.
-
-### `clear()`
-
-Clears the terminal output.
+*   `async boot()`: Starts the terminal. This initializes the UI, runs all registered boot checks, loads saved sessions from `localStorage`, and displays the welcome message.
+*   `registerAddon(addonInstance)`: Registers an `Addon` instance with the `addonExecutor`.
+*   `async runCommand(commandString)`: Programmatically executes a command string as if the user had typed it.
+*   `clear()`: Clears all visible output from the terminal screen.
 
 ---
 
-## `Addon`
+## `TerminalUI`
 
-The `Addon` class is the base class for creating new addons.
+Handles all interaction with the DOM. You can let `CentralTerminal` create it for you or instantiate it yourself for more complex integrations.
 
-### `constructor(name)`
+### `constructor(containerSelector, onCommand, onAutocomplete, options)`
 
-*   `name` (String): The name of the addon. This is the name that will be used to start the addon with the `run` command.
-
-### `onStart(term, vOS, ...args)`
-
-*   `term` (CentralTerminal): The `CentralTerminal` instance.
-*   `vOS` (VOS): The virtual operating system instance. See the `VOS` API reference below.
-*   `...args` (Array): Any additional arguments passed to the `run` command.
-
-This method is called when the addon is started. It can be used to initialize the addon and perform any setup tasks.
-
-### `onCommand(input)`
-
-*   `input` (String): The command entered by the user.
-
-This method is called for every command the user enters while the addon is active. The addon is responsible for parsing and handling the command.
-
-### `onStop()`
-
-This method is called when the addon is stopped (e.g., when the user runs the `exit` command).
+*   `containerSelector` (String): The CSS selector for the main container element.
+*   `onCommand` (Function): The callback function to execute when the user enters a command.
+*   `onAutocomplete` (Function): The callback for handling `Tab` completion.
+*   `options` (Object): An optional object to map to existing DOM elements:
+    *   `outputSelector` (String): CSS selector for the element that will display command output.
+    *   `promptSelector` (String): CSS selector for the element displaying the prompt (e.g., `$ `).
+    *   `inputSelector` (String): CSS selector for the `<input>` element.
 
 ---
 
 ## `VOS` (Virtual Operating System)
 
-The `VOS` class provides the API for interacting with the virtual file system. An instance is passed to every addon's `onStart` method.
+Provides the API for interacting with the virtual file system. An instance is available at `CentralTerminal.vOS`.
 
-### `createFile(path, content)`
-*   `path` (String): The full path of the file to create.
-*   `content` (String): Optional initial content for the file.
-*   **Returns**: `true` on success, `false` if the file already exists or the path is invalid.
+### File & Directory Operations
 
-### `readFile(path)`
-*   `path` (String): The full path of the file to read.
-*   **Returns**: The file content as a string, or `null` if the file does not exist.
+*   `writeFile(path, content, ftype, overwrite)`: Creates or updates a file. `ftype` is an optional string (e.g., `'text'`). `overwrite` defaults to `true`.
+*   `readFile(path)`: Returns the content of a file as a string, or `null` if it doesn't exist.
+*   `unlink(path)`: Deletes a file. Returns `true` on success.
+*   `mkdir(path)`: Creates a new directory. For recursive creation, use `_mkdirp(path)` (internal method).
+*   `rmdir(path)`: Removes an empty directory.
+*   `ls(path)`: Returns an array of names for files and directories at a given path.
+*   `chdir(path)`: Changes the current working directory.
 
-### `updateFile(path, content)`
-*   `path` (String): The full path of the file to update.
-*   `content` (String): The new content to write to the file.
-*   **Returns**: `true` on success, `false` if the file does not exist.
+### Path Manipulation
 
-### `deleteFile(path)`
-*   `path` (String): The full path of the file to delete.
-*   **Returns**: `true` on success, `false` if the file does not exist.
-
-### `createDirectory(path)`
-*   `path` (String): The full path of the directory to create.
-*   **Returns**: `true` on success, `false` if the directory already exists or the path is invalid.
-
-### `listDirectory(path)`
-*   `path` (String): The path of the directory to list.
-*   **Returns**: An array of strings containing the names of files and directories, or `null` if the path is not a valid directory.
-
-### `getFullPath(path)`
-*   `path` (String): The relative or absolute path to resolve. Supports `.`, `..`, and `~` for the user's home directory.
-*   **Returns**: The fully resolved absolute path as a string.
-
-### `pathExists(path)`
-*   `path` (String): The path to check.
-*   **Returns**: `true` if a file or directory exists at the given path, `false` otherwise.
+*   `normalize(path)`: Resolves a path to its absolute form, handling `.` , `..`, and `~` (home directory).
+*   `resolve(path)`: Resolves a path to its corresponding `VFile` or `VDirectory` object, or `null` if it doesn't exist.
+*   `parentOf(path)`: Returns the `VDirectory` object of the parent.
+*   `pathOf(node)`: Returns the full string path of a given `VFile` or `VDirectory` object.
 
 ---
 
-## Other Classes
+## Addon System
 
-For information on the `BootCheck`, `BootCheckRegistry`, `Command`, `CommandRegistry`, and `AddonExecutor` classes, please refer to the source code.
+Addons are self-contained modules that can be launched from the main terminal.
+
+### `Addon` (Base Class)
+
+Create a new class that extends `Addon`.
+
+#### `constructor(name)`
+
+*   `name` (String): The command used to launch your addon (e.g., `run my_addon`).
+
+#### Lifecycle Methods
+
+*   `onStart(args)`: Called when the addon is started. `args` is an array of any arguments passed to the `run` command. Use this to set up your addon's initial state and UI.
+*   `onStop()`: Called when the addon is exited (e.g., via the `exit` command). Use this for cleanup.
+
+#### Input Handling
+
+*   `handleCommand(input)`: This method is called for every line of user input while the addon is active. You are responsible for parsing and handling the input.
+
+#### Addon-Specific Commands
+
+*   `addCommand(name, description, executeFn)`: Within your addon's constructor or `onStart` method, you can define a set of commands that are only available when your addon is running.
+
+*   `exit()`: A built-in method that stops the addon and returns control to the main terminal.
+
+---
+
+## Boot Sequence
+
+The boot sequence runs diagnostics before the terminal starts. You can add your own checks.
+
+### `BootCheck`
+
+This class represents a single check.
+
+*   `constructor(name, fn, description)`:
+    *   `name` (String): The name of the check displayed during boot.
+    *   `fn` (Function): An async function that performs the check. It should return `true` for success and `false` for failure.
+
+### `BootCheckRegistry`
+
+Accessed via `CentralTerminal.bootRegistry`.
+
+*   `add(check)`: Use this method to add a new `BootCheck` instance to the boot sequence.
+
+### Example: Adding a Custom Boot Check
+
+```javascript
+import { CentralTerminal, BootCheck } from './src/terminal.js';
+
+const term = new CentralTerminal('#terminal-container');
+
+const myCheck = new BootCheck(
+  'Checking for custom API',
+  async () => {
+    // Replace with a real check
+    const response = await fetch('https://api.example.com/status');
+    return response.ok;
+  }
+);
+
+term.bootRegistry.add(myCheck);
+
+term.boot(); // The custom check will run on boot
+```

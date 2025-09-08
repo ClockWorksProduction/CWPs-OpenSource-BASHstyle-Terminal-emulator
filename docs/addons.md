@@ -1,93 +1,197 @@
-# Addon Architecture (v5.1+)
+# Building Addons (v5.1+)
 
-The terminal features a powerful addon system that allows for the creation of self-contained sub-applications within the main terminal environment. Addons can have their own set of commands, manage their own state, and control their own lifecycle.
+This guide provides a comprehensive walkthrough of the CWP Open Terminal Emulator's addon system. It is designed for developers who want to extend the terminal's functionality by creating their own sub-applications.
 
-## Core Concepts
+---
 
-The addon system is built around two primary classes:
+## Addon Architecture
 
-1.  **`Addon` (Base Class):** The foundation for all addons. It provides the core structure and functionality that the `AddonExecutor` uses to manage the addon.
-2.  **`AddonExecutor`:** The manager responsible for registering, starting, stopping, and routing input to the active addon.
+The terminal features a powerful addon system that allows for the creation of self-contained applications within the main terminal environment. When an addon is active, it takes full control of the user input loop, allowing for a completely unique set of commands and interactions.
 
-When an addon is active, the `AddonExecutor` hijacks the main terminal input. The prompt changes to indicate the active addon (e.g., `(edit)>`), and all user input is passed directly to the addon's `handleCommand` method instead of the main terminal's command processor.
+### Core Concepts
 
-## Creating a New Addon
+1.  **`Addon` (Base Class):** All addons must extend this class. It provides the essential structure (`constructor`, lifecycle methods) that the terminal uses to manage the addon.
 
-To create a new addon, you must extend the base `Addon` class.
+2.  **`AddonExecutor`:** This is an internal manager responsible for registering, starting, stopping, and routing all input to the currently active addon.
+
+3.  **Hijacking the Prompt:** When an addon starts, the `AddonExecutor` changes the terminal prompt (e.g., from `$` to `(notepad)>`) and forwards all user input directly to the addon's `handleCommand` method. This continues until the addon calls `this.exit()`.
+
+---
+
+## Tutorial: Building a "Notepad" Addon
+
+Let's build a practical addon: a simple `notepad` for creating and viewing short notes. This will demonstrate state, file system interaction, and custom commands.
+
+### Step 1: Create the Addon Class
+
+First, define a new class that extends `Addon`.
 
 ```javascript
-// src/terminal.js
-
-class MyCoolAddon extends Addon {
+// Extend the base Addon class
+class NotepadAddon extends Addon {
     constructor() {
-        // 1. Call super() with the addon's name.
-        // This name is used to invoke the addon via `run <name>`.
-        super('mycool');
+        // 1. Call super() with the addon's invocation name.
+        // This is the name used in `run notepad`.
+        super('notepad');
 
-        // 2. Register addon-specific commands.
-        // All addons automatically get 'help' and 'exit'.
-        this.addCommand('dance', 'Perform a dance.', () => this.performDance());
-        this.addCommand('status', 'Check dancer status.', () => this.checkStatus());
+        // 2. Initialize the addon's internal state.
+        this.notes = {}; // A simple object to hold our notes by title.
 
-        // 3. Initialize any internal state.
-        this.isDancing = false;
+        // 3. Register the addon-specific commands.
+        // Every addon automatically gets `help` and `exit`.
+        this.addCommand('new', 'Create a new note', args => this.newNote(args));
+        this.addCommand('view', 'View a note', args => this.viewNote(args));
+        this.addCommand('list', 'List all notes', () => this.listNotes());
+        this.addCommand('save', 'Save notes to the file system', () => this.save());
+        this.addCommand('load', 'Load notes from the file system', () => this.load());
     }
 
-    // (Optional) Called when the addon starts.
-    onStart(args) {
-        this.term.clear();
-        this.term._print('MyCoolAddon has started! Arguments: ' + args.join(', '));
-        this.commands.help.execute(); // Show addon-specific help
-    }
+    // ... more methods to come
+}
+```
 
-    // (Optional) Called when the addon stops.
-    onStop() {
-        this.term._print('MyCoolAddon has stopped. Thanks for dancing!');
-    }
+### Step 2: Implement Lifecycle Methods
 
-    // --- Custom Methods ---
-    performDance() {
-        this.isDancing = true;
-        this.term._print('\(^-^)/ KIRBY DANCE \(^-^)/');
-    }
+Lifecycle methods are the entry and exit points for your addon.
 
-    checkStatus() {
-        this.term._print(this.isDancing ? 'Currently dancing.' : 'Not dancing.');
+*   `onStart(args)`: Called when the user runs `run notepad`.
+*   `onStop()`: Called when the user runs `exit` from within the addon.
+
+```javascript
+// Inside the NotepadAddon class
+
+// onStart is the entry point.
+onStart(args) {
+    this.term.clear();
+    this.term._print('--- Notepad Addon ---');
+    this.term._print('Welcome! Type `help` for a list of commands.');
+    
+    // Automatically load previous notes.
+    this.load(); 
+}
+
+// onStop is the exit point.
+onStop() {
+    // A good practice is to remind the user to save.
+    this.term._print('Exiting Notepad. Don\'t forget to save your work!');
+}
+```
+
+### Step 3: Define Custom Command Logic
+
+Now, implement the methods that your registered commands call. These methods have access to the `CentralTerminal` instance via `this.term` and the virtual file system via `this.vOS`.
+
+```javascript
+// Inside the NotepadAddon class
+
+newNote(args) {
+    const title = args.shift();
+    const content = args.join(' ');
+    if (!title || !content) {
+        this.term._print('Usage: new <title> <content>');
+        return;
+    }
+    this.notes[title] = content;
+    this.term._print(`Note created: "${title}"`);
+}
+
+viewNote(args) {
+    const title = args[0];
+    if (!title || !this.notes[title]) {
+        this.term._print('Note not found.');
+        return;
+    }
+    this.term._print(`--- ${title} ---\n${this.notes[title]}`);
+}
+
+listNotes() {
+    const titles = Object.keys(this.notes);
+    if (titles.length === 0) {
+        this.term._print('No notes yet.');
+        return;
+    }
+    this.term._print('--- All Notes ---\n' + titles.join('\n'));
+}
+```
+
+### Step 4: Interact with the Virtual File System
+
+To make the notes persistent, we need to save and load them from the `VOS`.
+
+```javascript
+// Inside the NotepadAddon class
+
+getNotesFilePath() {
+    // Use a consistent location in the virtual home directory.
+    return this.vOS.normalize('~/notepad.json');
+}
+
+save() {
+    const path = this.getNotesFilePath();
+    const jsonContent = JSON.stringify(this.notes, null, 2);
+    
+    // Use the vOS to write the file.
+    if (this.vOS.writeFile(path, jsonContent, 'text', true)) {
+        this.term._print('Notes saved successfully.');
+    } else {
+        this.term._print('Error: Could not save notes.');
+    }
+}
+
+load() {
+    const path = this.getNotesFilePath();
+    const jsonContent = this.vOS.readFile(path);
+
+    if (jsonContent) {
+        try {
+            this.notes = JSON.parse(jsonContent);
+            this.term._print('Notes loaded successfully.');
+        } catch (e) {
+            this.term._print('Error: Could not parse notes file.');
+        }
+    } else {
+        this.term._print('No saved notes file found. Starting fresh.');
     }
 }
 ```
 
-## Registering Your Addon
+### Step 5: Register the Addon
 
-Once the addon class is created, you must register an instance of it with the `CentralTerminal`.
-
-This is typically done in the main file where you initialize the terminal.
+Finally, instantiate your addon and register it with the main `CentralTerminal` instance before booting.
 
 ```javascript
 // In your main application file (e.g., index.js)
+import { CentralTerminal, Addon } from './src/terminal.js';
 
-import { CentralTerminal, MyCoolAddon } from './src/terminal.js';
+// ... (paste the NotepadAddon class here)
 
 const term = new CentralTerminal('#terminal-container');
 
 // Register the addon instance
-term.registerAddon(new MyCoolAddon());
+term.registerAddon(new NotepadAddon());
 
 // Boot the terminal
 term.boot();
 ```
 
-## Invoking the Addon
+### Final Usage
 
-Addons are started using the built-in `run` command.
+Once registered, the addon is fully usable:
 
 ```bash
-$ run mycool
-(mycool)> dance
-\(^-^)/ KIRBY DANCE \(^-^)/
-(mycool)> status
-Currently dancing.
-(mycool)> exit
-Returned to main terminal.
+$ run notepad
+(notepad)> new MyFirstNote This is the content.
+(notepad)> save
+(notepad)> exit
 $
 ```
+
+---
+
+## Best Practices
+
+*   **Clear Feedback:** Always print messages to the user to confirm actions (`Note saved`, `File not found`, etc.).
+*   **Use `onStart` and `onStop`:** Use the lifecycle methods for setup and cleanup. Avoid doing heavy work in the constructor.
+*   **State Management:** For simple state, internal properties are fine. For complex state, consider saving to the `VOS` frequently.
+*   **Error Handling:** Check for the existence of files before reading them. Use `try...catch` blocks when parsing data like JSON.
+*   **Help Command:** Rely on the built-in `help` command. Just use `this.addCommand()` with a clear description, and it will be automatically included.

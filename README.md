@@ -1,4 +1,4 @@
-# CWP Open Terminal Emulator v5.1.0
+# CWP Open Terminal Emulator v5.1.4
 
 CWP Open Terminal Emulator is a versatile, embeddable, and highly extensible terminal emulator for web applications. It provides a realistic BASH-like experience, complete with a virtual file system, command history, and a powerful, modern addon architecture.
 
@@ -26,7 +26,17 @@ For more detailed information, see the **[Release & Publishing Guide](docs/relea
 - **Asynchronous Commands:** Supports long-running and animated commands like `aafire` and `cmatrix` without blocking the UI.
 - **Comprehensive Test Suite:** 100% test coverage for all 44 commands, ensuring stability and reliability.
 
-## Quick Start
+## Quick Setup (Automated)
+
+For the fastest setup, use the automated CLI tool. This will create a new directory with a sample project, including all the necessary HTML, CSS, and JS files.
+
+```bash
+npx cwp-terminal-setup
+```
+
+The script will guide you through the process. After running the setup, you can start the project by opening the `index.html` file in your browser.
+
+## Quick Start (Manual)
 
 To embed the terminal in your project:
 

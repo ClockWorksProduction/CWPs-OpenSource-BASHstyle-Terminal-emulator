@@ -14,13 +14,13 @@ This documentation will guide you through the installation, configuration, and u
 
 ## Where to Start
 
-*   **New to the project?** Start with the **[Getting Started](./getting-started.md)** guide to learn how to install and initialize the terminal.
+*   **New to the project?** Start with the **[Setup Guide](./SETUP.md)** to learn how to install and initialize the terminal.
 *   **Want to see the commands?** Check out the **[Default Commands](./commands.md)** reference for a full list of available commands and their usage.
 *   **Ready to build your own features?** Dive into the **[Addon System](./addons.md)** guide and the **[API Reference](./api-reference.md)**.
 
 ## Table of Contents
 
-*   [Getting Started](./getting-started.md)
+*   [Setup Guide](./SETUP.md)
 *   [API Reference](./api-reference.md)
 *   [Default Commands](./commands.md)
 *   [Addon System](./addons.md)
