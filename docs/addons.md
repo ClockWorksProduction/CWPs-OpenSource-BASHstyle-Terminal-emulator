@@ -1,70 +1,93 @@
-# Addon System
+# Addon Architecture (v5.1+)
 
-This document describes the addon system for the CWP Open Terminal Emulator.
+The terminal features a powerful addon system that allows for the creation of self-contained sub-applications within the main terminal environment. Addons can have their own set of commands, manage their own state, and control their own lifecycle.
 
-Addons are self-contained modules that extend the functionality of the terminal. They can be used to add new commands, create interactive experiences, and more.
+## Core Concepts
 
-## Official Addons
+The addon system is built around two primary classes:
 
-The CWP Open Terminal Emulator comes with a suite of official addons that are available to be used out of the box:
+1.  **`Addon` (Base Class):** The foundation for all addons. It provides the core structure and functionality that the `AddonExecutor` uses to manage the addon.
+2.  **`AddonExecutor`:** The manager responsible for registering, starting, stopping, and routing input to the active addon.
 
-*   `edit`: A simple text editor for creating and editing files.
-*   `tpkg`: A package manager for installing, updating, and removing addons.
-*   `top`: A system monitor that displays information about the terminal's performance.
-*   `rps`: A simple rock-paper-scissors game.
-*   `net`: A collection of network tools for inspecting and interacting with the terminal's virtual network.
+When an addon is active, the `AddonExecutor` hijacks the main terminal input. The prompt changes to indicate the active addon (e.g., `(edit)>`), and all user input is passed directly to the addon's `handleCommand` method instead of the main terminal's command processor.
 
-## Creating Addons
+## Creating a New Addon
 
-Addons are created by extending the `Addon` class and implementing the required methods. The addon system is designed to be simple and flexible, allowing you to create powerful extensions for the terminal.
-
-For more detailed information on the addon API, please refer to the [API Reference](./api-reference.md).
-
-### Basic Addon Template
-
-The following is a basic addon template that demonstrates the core concepts of the addon system:
+To create a new addon, you must extend the base `Addon` class.
 
 ```javascript
-import { Addon } from '/src/index.js';
+// src/terminal.js
 
-class MyAddon extends Addon {
+class MyCoolAddon extends Addon {
     constructor() {
-        // The command that will be used to launch the addon
-        super('mycommand');
+        // 1. Call super() with the addon's name.
+        // This name is used to invoke the addon via `run <name>`.
+        super('mycool');
+
+        // 2. Register addon-specific commands.
+        // All addons automatically get 'help' and 'exit'.
+        this.addCommand('dance', 'Perform a dance.', () => this.performDance());
+        this.addCommand('status', 'Check dancer status.', () => this.checkStatus());
+
+        // 3. Initialize any internal state.
+        this.isDancing = false;
     }
 
-    // Called when the addon is started
-    onStart(term, vOS, ...args) {
-        super.onStart(term, vOS, ...args);
-        this.term.print('My addon has started!');
-        this.term.print(`Arguments received: ${args.join(', ')}`);
-
-        // Set the prompt to indicate that the addon is active
-        this.term.setPrompt('myaddon> ');
+    // (Optional) Called when the addon starts.
+    onStart(args) {
+        this.term.clear();
+        this.term._print('MyCoolAddon has started! Arguments: ' + args.join(', '));
+        this.commands.help.execute(); // Show addon-specific help
     }
 
-    // Called for every command the user enters while the addon is active
-    onCommand(input) {
-        if (input.toLowerCase() === 'quit') {
-            this.exit(); // Use this.exit() to stop the addon
-            return;
-        }
-        this.term.print(`You typed: ${input}`);
-    }
-
-    // Called when the addon is stopped
+    // (Optional) Called when the addon stops.
     onStop() {
-        this.term.print('My addon is stopping.');
-        this.term.resetPrompt(); // Reset the prompt to its default state
+        this.term._print('MyCoolAddon has stopped. Thanks for dancing!');
     }
-}
 
-// Register the addon with the terminal's addon executor
-export function register(addonExecutor) {
-    addonExecutor.registerAddon(new MyAddon());
+    // --- Custom Methods ---
+    performDance() {
+        this.isDancing = true;
+        this.term._print('\(^-^)/ KIRBY DANCE \(^-^)/');
+    }
+
+    checkStatus() {
+        this.term._print(this.isDancing ? 'Currently dancing.' : 'Not dancing.');
+    }
 }
 ```
 
-### Contributing Addons
+## Registering Your Addon
 
-If you create an addon that you think would be a good addition to the official addon suite, we welcome contributions! Please read our [Contributing Guidelines](../CONTRIBUTING.md) for more details on the development process.
+Once the addon class is created, you must register an instance of it with the `CentralTerminal`.
+
+This is typically done in the main file where you initialize the terminal.
+
+```javascript
+// In your main application file (e.g., index.js)
+
+import { CentralTerminal, MyCoolAddon } from './src/terminal.js';
+
+const term = new CentralTerminal('#terminal-container');
+
+// Register the addon instance
+term.registerAddon(new MyCoolAddon());
+
+// Boot the terminal
+term.boot();
+```
+
+## Invoking the Addon
+
+Addons are started using the built-in `run` command.
+
+```bash
+$ run mycool
+(mycool)> dance
+\(^-^)/ KIRBY DANCE \(^-^)/
+(mycool)> status
+Currently dancing.
+(mycool)> exit
+Returned to main terminal.
+$
+```

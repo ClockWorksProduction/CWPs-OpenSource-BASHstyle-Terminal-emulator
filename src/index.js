@@ -1,4 +1,4 @@
-import { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, VFile, VDirectory, VOS } from './terminal.js';
+import { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, EditorAddon, RpsAddon, VFile, VDirectory, VOS, TerminalUI } from './terminal.js';
 
 // Export the main terminal class
-export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, VFile, VDirectory, VOS };
+export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, EditorAddon, RpsAddon, VFile, VDirectory, VOS, TerminalUI };

@@ -1,8 +1,12 @@
-import { CentralTerminal } from '../src/index.js';
+import { CentralTerminal, EditorAddon, RpsAddon } from '../src/index.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
         const term = new CentralTerminal('#central-terminal-container');
+        // Register the addons you want to use
+        term.registerAddon(new EditorAddon());
+        term.registerAddon(new RpsAddon());
+
         term.boot();
     } catch (e) {
         console.error("Error booting terminal:", e);

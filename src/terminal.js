@@ -221,36 +221,181 @@ class BootCheckRegistry {
   }
 }
 
-// ---------- Addon System ----------
+// ---------- Addon System (New) ----------
 class Addon {
   constructor(name) {
     if (!name) throw new Error("Addon must have a name.");
     this.name = name;
     this.term = null;
     this.vOS = null;
+    this.commands = {}; // Each addon has its own commands
+
+    // Add default commands common to all addons
+    this.addCommand('exit', 'Exit the current addon', () => this.exit());
+    this.addCommand('help', 'Show help for this addon', () => {
+        this.term._print(`Available commands within '${this.name}':\\n`);
+        const longest = Math.max(...Object.keys(this.commands).map(n => n.length));
+        Object.values(this.commands)
+          .sort((a,b) => a.name.localeCompare(b.name))
+          .forEach(c => this.term._print(`${c.name.padEnd(longest)} - ${c.desc}`));
+    });
   }
 
+  // Add a command to the addon
+  addCommand(name, desc, exec) {
+      this.commands[name] = { name, desc, execute: exec };
+  }
+
+  // Internal initialization
   _init(term, vOS) {
     this.term = term;
     this.vOS = vOS;
   }
 
-  onStart(args) {
-    this.term._print(`Addon '${this.name}' started.`);
-    this.exit();
+  // Called when addon starts. To be overridden by subclasses.
+  onStart(args) {}
+
+  // Handles input, parsing it into commands for the addon.
+  handleCommand(input) {
+    const parts = input.match(/[^\s"']+|"([^"]*)"|'([^']*)'/g) || [];
+    if (!parts) return;
+    
+    const name = (parts.shift() || '').replace(/['"]/g, '').toLowerCase();
+    const args = parts.map(a => a.replace(/['"]/g, ''));
+
+    const cmd = this.commands[name];
+    if (cmd) {
+      cmd.execute(args, this.term, this.vOS);
+    } else if (name) {
+      this.term._print(`${this.name}: ${name}: command not found`);
+    }
   }
 
-  onCommand(input) {
-    if (input.toLowerCase() === 'exit') this.exit();
-  }
-
+  // Called when addon stops. To be overridden.
   onStop() {}
 
+  // Exits the addon, returning control to the main terminal.
   exit() {
     if (this.term && this.term.addonExecutor.activeAddon === this) {
       this.term.addonExecutor.stop();
     }
   }
+}
+
+// --- New Addon Implementations ---
+class EditorAddon extends Addon {
+    constructor() {
+        super('edit');
+        this.filePath = null;
+        this.lines = [];
+        this.isDirty = false;
+    }
+
+    onStart(args) {
+        this.filePath = this.vOS.normalize(args[0] || 'untitled.txt');
+        const content = this.vOS.readFile(this.filePath);
+
+        // CORRECTED LINE:
+        // If content is null (a new file), start with an empty array.
+        // Otherwise, split the content. This prevents the initial blank line.
+        this.lines = content === null ? [] : content.split('\n');
+
+        this.isDirty = false;
+        
+        this.term.clear();
+        this.term._print(`Editing "${this.filePath}".`);
+        this.term._print('Enter text to add lines. Commands: :w (save), :q (quit), :wq (save & quit)');
+        
+        // Display existing lines if there are any
+        if (this.lines.length > 0) {
+            this.lines.forEach((line, i) => this.term._print(`${String(i + 1).padStart(3)}  ${line}`));
+        }
+    }
+    
+    // Override default command handling for special editor logic
+    handleCommand(input) {
+        if (input.startsWith(':')) {
+            const cmd = input.substring(1).toLowerCase();
+            switch (cmd) {
+                case 'w': this.saveFile(); break;
+                case 'q':
+                    if (this.isDirty) this.term._print('Warning: Unsaved changes. Use :q! or :wq.');
+                    else this.exit();
+                    break;
+                case 'q!': this.exit(); break;
+                case 'wq': this.saveFile(); this.exit(); break;
+                default: this.term._print(`Unknown editor command: ${cmd}`);
+            }
+        } else {
+            this.lines.push(input);
+            this.isDirty = true;
+            this.term._print(`${String(this.lines.length).padStart(3)}  ${input}`);
+        }
+    }
+
+    saveFile() {
+        const content = this.lines.join('\n');
+        if (this.vOS.writeFile(this.filePath, content, 'text', true)) {
+            this.isDirty = false;
+            this.term._print('File saved.');
+            this.term._saveState();
+        } else {
+            this.term._print('Error: Could not save file.');
+        }
+    }
+
+    onStop() {
+        this.term.clear();
+        this.term._print('Returned to main terminal.');
+    }
+}
+
+class RpsAddon extends Addon {
+    constructor() {
+        super('rps');
+        this.player = 0;
+        this.cpu = 0;
+        this.rounds = 0;
+
+        // Register addon-specific commands
+        this.addCommand('rock', 'Choose rock', () => this.play('rock'));
+        this.addCommand('paper', 'Choose paper', () => this.play('paper'));
+        this.addCommand('scissors', 'Choose scissors', () => this.play('scissors'));
+        this.addCommand('score', 'View the current score', () => this.showScore());
+    }
+
+    onStart() {
+        this.term.clear();
+        this.term._print('--- Rock, Paper, Scissors ---');
+        this.commands.help.execute(); // Show rps-specific help
+        this.player = 0; this.cpu = 0; this.rounds = 0;
+    }
+
+    play(playerChoice) {
+        const choices = ['rock', 'paper', 'scissors'];
+        const cpuChoice = choices[Math.floor(Math.random() * 3)];
+        this.term._print(`> You: ${playerChoice} | Computer: ${cpuChoice}`);
+
+        if (playerChoice === cpuChoice) {
+            this.term._print("It's a tie!");
+        } else if ((playerChoice === 'rock' && cpuChoice === 'scissors') || (playerChoice === 'paper' && cpuChoice === 'rock') || (playerChoice === 'scissors' && cpuChoice === 'paper')) {
+            this.term._print('You win!'); this.player++;
+        } else {
+            this.term._print('Computer wins.'); this.cpu++;
+        }
+        this.rounds++;
+        this.term._print('---');
+    }
+
+    showScore() {
+        this.term._print(`-- Score: Player ${this.player} - ${this.cpu} CPU (${this.rounds} rounds) --`);
+    }
+    
+    onStop() {
+        this.term.clear();
+        this.term._print('Thanks for playing!');
+        this.showScore();
+    }
 }
 
 class AddonExecutor {
@@ -278,18 +423,22 @@ class AddonExecutor {
     }
     this.activeAddon = addon;
     this.activeAddon.onStart(args);
+    this.term.ui.setPrompt(this.term.prompt());
   }
 
   stop() {
     if (!this.activeAddon) return;
-    this.activeAddon.onStop();
-    this.activeAddon = null;
+    const addon = this.activeAddon;
+    this.activeAddon = null; // Set to null *before* onStop to prevent re-entry issues
+    addon.onStop();
+    this.term.ui.setPrompt(this.term.prompt());
   }
 
   handleCommand(input) {
     if (this.activeAddon) {
-      this.activeAddon.onCommand(input);
-      return true; // handled
+      this.term.ui.appendTerminalOutput(`${this.term.prompt()}${input}`);
+      this.activeAddon.handleCommand(input);
+      return true;
     }
     return false;
   }
@@ -301,6 +450,7 @@ class AddonExecutor {
 class TerminalUI {
   // onCommand(command) : function to call on Enter
   // onAutocomplete() : function to call on Tab
+  
   constructor(containerSelector, onCommand, onAutocomplete = null) {
     const container = document.querySelector(containerSelector);
     if (!container) throw new Error(`Terminal container element not found: ${containerSelector}`);
@@ -380,7 +530,7 @@ class TerminalUI {
 // ---------- Central Terminal ----------
 class CentralTerminal {
   constructor(containerOrUI) {
-    this.version = '5.1.0'; // Consistent version
+    this.version = '5.1.0';
 
     if (typeof containerOrUI === 'string') {
       this.ui = new TerminalUI(containerOrUI, this.runCommand.bind(this), this._autoComplete.bind(this));
@@ -390,8 +540,9 @@ class CentralTerminal {
 
     this.vOS = new VOS();
     this.commandHistory = [];
-    this.historyIndex = -1; // For future history navigation
+    this.historyIndex = -1;
     this.commands = {};
+    // this.editor and this.rps are now obsolete and have been removed.
     this.addonExecutor = new AddonExecutor(this, this.vOS);
     this.bootRegistry = new BootCheckRegistry();
     this._registerDefaultCommands();
@@ -402,7 +553,12 @@ class CentralTerminal {
   _biosWrite(text) { this.ui.appendTerminalOutput(text, false); }
   _biosWriteLine(text) { this.ui.appendTerminalOutput(text, true); }
   clear() { this.ui.clearTerminal(); }
-  prompt() { return this.addonExecutor.isActive() ? '' : '$ '; }
+  prompt() {
+    if (this.addonExecutor.isActive()) {
+        return `(${this.addonExecutor.activeAddon.name})> `;
+    }
+    return '$ ';
+}
   _saveHistory() { localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
   _saveState() { localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
 
@@ -410,32 +566,34 @@ class CentralTerminal {
   registerAddon(addonInstance) { this.addonExecutor.register(addonInstance); }
   addCommand(cmd) { this.commands[cmd.name] = cmd; }
 
-  // --- Main Command Runner ---
-  runCommand(rawInput) {
+  // --- Main Command Runner (REPLACE THIS METHOD) ---
+  async runCommand(rawInput) {
     const input = String(rawInput || '').trim();
 
-    // Update the UI prompt before anything else
-    this.ui.setPrompt(this.prompt());
-    
-    // 1. If an addon is active, it gets exclusive control.
+    // This part now correctly handles addon input and exits early.
     if (this.addonExecutor.handleCommand(input)) {
-        return; // Input was handled, stop here.
+        return;
     }
 
-    // 2. If no addon is active, proceed with normal command handling.
-    if (!input) return;
-
-    // Echo the command now that we know it's not going to an active addon
-    this.ui.appendTerminalOutput(`${this.prompt()}${input}`);
+    // This handles empty commands sent to the main terminal.
+    if (!input) {
+        this.ui.setPrompt(this.prompt());
+        return;
+    }
     
+    // Echo the command to the terminal UI.
+    this.ui.appendTerminalOutput(`${this.prompt()}${input}`);
+
+    // Save to history.
     if (this.commandHistory[this.commandHistory.length - 1] !== input) {
       this.commandHistory.push(input);
       this._saveHistory();
     }
 
+    // Parse the command and its arguments.
     const parts = input.match(/[^\s"']+|"([^"]*)"|'([^']*)'/g) || [];
-    const name = (parts.shift() || '').replace(/['\\"]/g, '').toLowerCase();
-    const args = parts.map(a => a.replace(/['\\"]/g, ''));
+    const name = (parts.shift() || '').replace(/['"]/g, '').toLowerCase();
+    const args = parts.map(a => a.replace(/['"]/g, ''));
 
     const cmd = this.commands[name];
     if (!cmd) {
@@ -443,10 +601,11 @@ class CentralTerminal {
       return;
     }
     
-    // Execute command and persist VFS state afterwards
-    cmd.execute(args, this);
+    // The 'await' here is the crucial fix for async commands.
+    await cmd.execute(args, this);
     this._saveState();
   }
+
 
   // --- Boot Sequence ---
   async boot() {
@@ -481,7 +640,7 @@ class CentralTerminal {
     }
   }
 
-  // ---------- Default Commands (Fully Implemented) ----------
+  // ---------- Default Commands (REPLACE THIS METHOD) ----------
   _registerDefaultCommands() {
     const cmd = (name, desc, exec) => ({ name, desc, execute: exec });
 
@@ -505,21 +664,28 @@ class CentralTerminal {
         term.runCommand('run rps');
     }));
 
-    // --- Filesystem ---
+    // --- Filesystem (with fixes) ---
     this.addCommand(cmd('ls', 'list files', args => {
       const files = this.vOS.ls(args[0] || '.');
       if (files === null) this._print(`ls: cannot access '${args[0] || '.'}'`);
       else if (files.length > 0) this._print(files.join('  '));
-      else this._print(''); // Handle empty directory
+      else this._print('');
     }));
     this.addCommand(cmd('cd', 'change directory', args => {
       if (!this.vOS.chdir(args[0] || this.vOS.homePath)) this._print(`cd: ${args[0]}: No such directory`);
     }));
     this.addCommand(cmd('pwd', 'print working directory', () => this._print(this.vOS.pathOf(this.vOS.cwd))));
+    
+    // UPDATED MKDIR: Now supports -p flag for the 'tree' test
     this.addCommand(cmd('mkdir', 'make directory', args => {
-      if (!args[0]) this._print('usage: mkdir <dir>');
-      else if (!this.vOS.mkdir(args[0])) this._print(`mkdir: cannot create directory '${args[0]}'`);
+      const pathArg = args.filter(a => !a.startsWith('-')).pop();
+      const pFlag = args.includes('-p');
+      if (!pathArg) { this._print('usage: mkdir [-p] <dir>'); return; }
+      
+      const success = pFlag ? this.vOS._mkdirp(pathArg) : this.vOS.mkdir(pathArg);
+      if (!success) this._print(`mkdir: cannot create directory '${pathArg}'`);
     }));
+
     this.addCommand(cmd('rmdir', 'remove empty directory', args => {
       if (!args[0]) this._print('usage: rmdir <dir>');
       else if (!this.vOS.rmdir(args[0])) this._print(`rmdir: failed to remove '${args[0]}'`);
@@ -545,24 +711,31 @@ class CentralTerminal {
     }));
     this.addCommand(cmd('touch', 'create empty file', args => {
       if (!args[0]) this._print('usage: touch <file>');
-      else this.vOS.writeFile(args[0], '', 'text', false); // Do not overwrite
+      else this.vOS.writeFile(args[0], '', 'text', false);
     }));
     this.addCommand(cmd('cat', 'print file contents', args => {
       const content = this.vOS.readFile(args[0]);
       this._print(content === null ? `cat: ${args[0]}: No such file` : content);
     }));
+
+    // UPDATED HEAD: Correctly parses arguments and slices content
     this.addCommand(cmd('head', 'first N lines of a file', args => {
         const f = args[0]; const n = parseInt(args[1] || '10', 10);
+        if (!f) { this._print('usage: head <file> [lines]'); return; }
         const node = this.vOS.resolve(f);
         if (!node || !(node instanceof VFile)) { this._print(`head: cannot open '${f}'`); return; }
-        this._print(node.content.split('\\n').slice(0, n).join('\\n'));
+        this._print(node.content.split('\n').slice(0, n).join('\n'));
     }));
+
+    // UPDATED TAIL: Correctly parses arguments and slices content
     this.addCommand(cmd('tail', 'last N lines of a file', args => {
         const f = args[0]; const n = parseInt(args[1] || '10', 10);
+        if (!f) { this._print('usage: tail <file> [lines]'); return; }
         const node = this.vOS.resolve(f);
         if (!node || !(node instanceof VFile)) { this._print(`tail: cannot open '${f}'`); return; }
-        this._print(node.content.split('\\n').slice(-n).join('\\n'));
+        this._print(node.content.split('\n').slice(-n).join('\n'));
     }));
+
     this.addCommand(cmd('tree', 'show directory tree', args => {
       const dir = this.vOS.resolve(args[0] || '.');
       if (!(dir instanceof VDirectory)) { this._print(`tree: ${args[0]}: No such directory`); return; }
@@ -570,6 +743,15 @@ class CentralTerminal {
       this._tree(dir, '');
     }));
     
+    // UPDATED GREP: Properly prints matching lines
+    this.addCommand(cmd('grep', 'search pattern in file', args => {
+      const [p, f] = args; if (!p || !f) { this._print('usage: grep <pattern> <file>'); return; }
+      const node = this.vOS.resolve(f); if (!node || !(node instanceof VFile)) { this._print(`grep: ${f}: No such file`); return; }
+      const re = new RegExp(p, 'g');
+      const matches = node.content.split('\n').filter(l => re.test(l));
+      if (matches.length > 0) this._print(matches.join('\n'));
+    }));
+
     // --- Mock FS Commands ---
     this.addCommand(cmd('ln', 'create symbolic link (mock)', () => this._print('ln: symbolic links not implemented')));
     this.addCommand(cmd('find', 'find files/directories (mock)', () => this._print('find: not implemented')));
@@ -584,13 +766,7 @@ class CentralTerminal {
     this.addCommand(cmd('kill', 'kill process (mock)', () => this._print('kill: simulated')));
     this.addCommand(cmd('pkill', 'kill by name (mock)', () => this._print('pkill: simulated')));
     this.addCommand(cmd('pgrep', 'find process by name (mock)', () => this._print('pgrep: simulated')));
-    this.addCommand(cmd('grep', 'search pattern in file', args => {
-      const [p, f] = args; if (!p || !f) { this._print('usage: grep <pattern> <file>'); return; }
-      const node = this.vOS.resolve(f); if (!node || !(node instanceof VFile)) { this._print(`grep: ${f}: No such file`); return; }
-      const re = new RegExp(p, 'g');
-      node.content.split('\\n').forEach(l => { if (re.test(l)) this._print(l); });
-    }));
-
+    
     // --- System Info ---
     this.addCommand(cmd('uname', 'system information', () => this._print(`CentralTerminal OS v${this.version}`)));
     this.addCommand(cmd('whoami', 'current user', () => this._print('user')));
@@ -615,7 +791,7 @@ class CentralTerminal {
           .forEach(c => this._print(`${c.name.padEnd(longest)} - ${c.desc}`));
     }));
 
-    // --- Fun / Visual ---
+    // --- Fun / Visual (Async) ---
     this.addCommand(cmd('aafire', 'ASCII fire animation', async () => {
         this._print('Starting ASCII fire... Press Ctrl+C to stop.');
         let running = true;
@@ -630,7 +806,7 @@ class CentralTerminal {
             }
         }
         this._print('ASCII fire stopped.');
-        this.ui.registerCtrlC(null); // Unregister handler
+        this.ui.registerCtrlC(null);
     }));
     this.addCommand(cmd('cmatrix', 'Matrix-style falling text', async () => {
         this._print('Starting Matrix... Press Ctrl+C to stop.');
@@ -644,9 +820,10 @@ class CentralTerminal {
             await new Promise(r => setTimeout(r, 100));
         }
         this._print('Matrix stopped.');
-        this.ui.registerCtrlC(null); // Unregister handler
+        this.ui.registerCtrlC(null);
     }));
   }
+
 
   // Helper for the 'tree' command
   _tree(dir, prefix) {
@@ -697,5 +874,4 @@ class CentralTerminal {
   }
 }
 
-
-export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, VFile, VDirectory, VOS };
+export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, EditorAddon, RpsAddon, VFile, VDirectory, VOS, TerminalUI };
