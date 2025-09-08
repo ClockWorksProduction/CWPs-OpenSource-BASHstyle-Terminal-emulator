@@ -2,8 +2,6 @@
 
 CWP Open Terminal Emulator is a versatile, embeddable, and highly extensible terminal emulator for web applications. It provides a realistic BASH-like experience, complete with a virtual file system, command history, and a powerful, modern addon architecture.
 
-![Terminal Screenshot](https://i.imgur.com/L5a2j8J.png)
-
 ## Release Channels
 
 This project uses a four-tier release system to provide versions for every need, from bleeding-edge development builds to stable long-term support. You can install any channel via npm.
@@ -13,7 +11,7 @@ This project uses a four-tier release system to provide versions for every need,
 | **Dev** | `@dev` | `main` | Every push | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg) |
 | **Nightly** | `@nightly`| `main` | Bi-weekly schedule | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg) |
 | **Stable** | `@latest` | `main` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg) |
-| **LTS** | `@lts` | `release/vX` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
+| **LTS** | `@lts` | `main` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
 
 For more detailed information, see the **[Release & Publishing Guide](docs/release-system.md)**.
 
