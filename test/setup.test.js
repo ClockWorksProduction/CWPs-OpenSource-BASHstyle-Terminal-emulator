@@ -5,10 +5,8 @@
 jest.mock('fs');
 jest.mock('readline', () => ({
   createInterface: jest.fn().mockReturnValue({
-    question: jest.fn().mockImplementation((query, callback) => {
-      // Default to 'scaffold' if not otherwise specified by a test
-      callback('scaffold');
-    }),
+    // The question mock will now be configured specifically within each test
+    question: jest.fn(),
     close: jest.fn(),
   }),
 }));
@@ -32,7 +30,11 @@ describe('CWP Terminal Setup Script', () => {
   });
 
   test('scaffold mode should generate a full project', async () => {
-    // Simulate user choosing 'scaffold' (which is the default mock behavior)
+    // Simulate user choosing a channel and then 'scaffold' mode
+    const questionMock = readline.createInterface().question;
+    questionMock.mockImplementationOnce((q, cb) => cb('latest')); // Channel
+    questionMock.mockImplementationOnce((q, cb) => cb('scaffold')); // Mode
+
     await main();
 
     // Verify the project directory is created
@@ -63,9 +65,10 @@ describe('CWP Terminal Setup Script', () => {
 
   test('refactor mode should patch existing files and create missing ones', async () => {
     // --- Test Setup ---
-    // 1. Simulate user input for 'refactor' mode
+    // 1. Simulate user input for channel, mode, and paths
     const questionMock = readline.createInterface().question;
-    questionMock.mockImplementationOnce((q, cb) => cb('refactor')); // Mode
+    questionMock.mockImplementationOnce((q, cb) => cb('dev'));        // Channel
+    questionMock.mockImplementationOnce((q, cb) => cb('refactor'));   // Mode
     questionMock.mockImplementationOnce((q, cb) => cb('index.html')); // HTML path
     questionMock.mockImplementationOnce((q, cb) => cb('app.js'));     // JS path
     questionMock.mockImplementationOnce((q, cb) => cb('style.css'));  // CSS path
@@ -108,8 +111,9 @@ describe('CWP Terminal Setup Script', () => {
   });
 
   test('manual mode should generate a custom app.js with all options', async () => {
-    // Simulate a user choosing 'manual' and providing all custom selectors
+    // Simulate a user choosing channel, 'manual' mode, and providing all custom selectors
     const questionMock = readline.createInterface().question;
+    questionMock.mockImplementationOnce((q, cb) => cb('lts'));        // Channel
     questionMock.mockImplementationOnce((q, cb) => cb('manual'));     // Mode
     questionMock.mockImplementationOnce((q, cb) => cb('#my-term'));   // Container
     questionMock.mockImplementationOnce((q, cb) => cb('.my-input'));  // Input

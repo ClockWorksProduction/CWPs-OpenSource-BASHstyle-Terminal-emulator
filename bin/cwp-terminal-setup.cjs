@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CWP Open Terminal Emulator — Setup CLI (v5.1.3 extended)
+ * CWP Open Terminal Emulator — Setup CLI (v5.1.4)
  * Modes:
  *   1. scaffold → generate full project (index.html, style.css, app.js, todo.md)
  *   2. refactor → inject terminal into existing files
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     term.registerAddon(new RpsAddon());
     await term.boot();
 
-    term._print("\\nCWP Open Terminal Emulator v5.1.3");
+    term._print("\\nCWP Open Terminal Emulator v5.1.4");
     term._print("(c) 2025 ClockWorks Production Studio");
     term._print("Type 'help' to see available commands.\\n");
   } catch (error) {
@@ -120,8 +120,16 @@ async function main() {
  CWP Open Terminal Emulator - Automated Setup
 --------------------------------------------------
 This script will help you create the necessary files to get started.
-It will create files in the current directory: \${process.cwd()}
 `);
+
+  const channel = await askQuestion(
+    "Which release channel do you want to use? (latest / lts / dev / nightly)",
+    "latest"
+  );
+
+  const installCommand = `npm install @clockworksproduction-studio/cwp-open-terminal-emulator@${channel}`;
+
+  console.log(`\nIt will create files in the current directory: \${process.cwd()}\n`);
 
   const mode = await askQuestion(
     "Setup mode? (scaffold / refactor / manual)",
@@ -189,8 +197,8 @@ It will create files in the current directory: \${process.cwd()}
  Setup Complete!
 --------------------------------------------------
 Next steps:
-  1. If you haven't already, add the library:
-     npm install @clockworksproduction-studio/cwp-open-terminal-emulator
+  1. If you haven't already, add the library by running:
+     ${installCommand}
 
   2. Open index.html in your browser (or your existing project)
      to see your terminal in action!
