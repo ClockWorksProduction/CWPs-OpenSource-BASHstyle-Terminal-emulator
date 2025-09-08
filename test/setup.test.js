@@ -1,142 +1,100 @@
+/** @jest-environment node */
 
-// test/setup.test.js
+import { jest } from '@jest/globals';
+import path from 'path';
 
-// Mock 'fs' and 'readline' modules for testing the CLI script in isolation.
-jest.mock('fs');
-jest.mock('readline', () => ({
-  createInterface: jest.fn().mockReturnValue({
-    // The question mock will now be configured specifically within each test
-    question: jest.fn(),
+// Mock the modules before any other imports
+jest.unstable_mockModule('readline', () => ({
+  createInterface: jest.fn(() => ({
+    question: jest.fn((_, cb) => cb('')),
     close: jest.fn(),
-  }),
+    on: jest.fn(),
+  })),
 }));
 
-const fs = require('fs');
-const readline = require('readline');
-// Import the main function after mocks are set up
-const { main } = require('../bin/cwp-terminal-setup.cjs');
+jest.unstable_mockModule('fs', () => ({
+  mkdirSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  readFileSync: jest.fn(),
+  existsSync: jest.fn(),
+}));
 
-describe('CWP Terminal Setup Script', () => {
+// Now, import the mocked modules and the script under test
+import readline from 'readline';
+import fs from 'fs';
+import { main } from '../bin/cwp-terminal-setup.cjs';
 
-  // Before each test, clear the history of mock function calls to ensure isolation.
+describe('CWP Terminal Setup Script (v5.2.4)', () => {
+  let questionMock;
+  let originalArgv;
+
   beforeEach(() => {
-    fs.writeFileSync.mockClear();
-    fs.mkdirSync.mockClear();
-    fs.readFileSync.mockClear();
-    fs.existsSync.mockClear();
-    const rl = readline.createInterface();
-    rl.question.mockClear();
-    rl.close.mockClear();
+    // Clear mock history before each test
+    jest.clearAllMocks();
+    originalArgv = process.argv;
+    // Get a reference to the mocked question function
+    questionMock = readline.createInterface().question;
   });
 
-  test('scaffold mode should generate a full project', async () => {
-    // Simulate user choosing a channel and then 'scaffold' mode
-    const questionMock = readline.createInterface().question;
-    questionMock.mockImplementationOnce((q, cb) => cb('latest')); // Channel
-    questionMock.mockImplementationOnce((q, cb) => cb('scaffold')); // Mode
-
-    await main();
-
-    // Verify the project directory is created
-    expect(fs.mkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('terminal-demo'),
-      { recursive: true }
-    );
-
-    // Verify that all four project files are written
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(4);
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('index.html'),
-      expect.stringContaining('CWP Open Terminal Emulator')
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('style.css'),
-      expect.stringContaining('#terminal')
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('app.js'),
-      expect.stringContaining("new CentralTerminal('#terminal')")
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('todo.md'),
-      expect.stringContaining('# TODO')
-    );
+  afterEach(() => {
+    process.argv = originalArgv;
   });
 
-  test('refactor mode should patch existing files and create missing ones', async () => {
-    // --- Test Setup ---
-    // 1. Simulate user input for channel, mode, and paths
-    const questionMock = readline.createInterface().question;
-    questionMock.mockImplementationOnce((q, cb) => cb('dev'));        // Channel
-    questionMock.mockImplementationOnce((q, cb) => cb('refactor'));   // Mode
-    questionMock.mockImplementationOnce((q, cb) => cb('index.html')); // HTML path
-    questionMock.mockImplementationOnce((q, cb) => cb('app.js'));     // JS path
-    questionMock.mockImplementationOnce((q, cb) => cb('style.css'));  // CSS path
+  describe('Flag-based execution', () => {
+    it('should generate a new project with --new', async () => {
+      process.argv = ['node', 'script.js', '--new'];
+      await main();
+      expect(fs.mkdirSync).toHaveBeenCalledWith(expect.stringContaining('terminal-demo'), { recursive: true });
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(4);
+    });
 
-    // 2. Simulate reading an HTML file that needs patching
-    const fakeHtml = '<html><body></body></html>';
-    fs.readFileSync.mockReturnValue(fakeHtml);
+    it('should use --dir for output directory with --new', async () => {
+      process.argv = ['node', 'script.js', '--new', '--dir', 'custom-output'];
+      await main();
+      const expectedDir = path.resolve(process.cwd(), 'custom-output');
+      expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
+    });
 
-    // 3. Simulate the CSS file not existing, so it needs to be created
-    fs.existsSync.mockReturnValue(false);
-    
-    // --- Run Script ---
-    await main();
+    it('should update JS file with --refactor', async () => {
+      process.argv = ['node', 'script.js', '--refactor'];
+      questionMock.mockImplementationOnce((q, cb) => cb('my-app.js'));
+      fs.existsSync.mockReturnValue(false);
+      await main();
+      expect(fs.writeFileSync).toHaveBeenCalledWith('my-app.js', expect.any(String));
+    });
 
-    // --- Assertions ---
-    // Verify it read the HTML file
-    expect(fs.readFileSync).toHaveBeenCalledWith('index.html', 'utf8');
-
-    // Verify it wrote the CSS file (since existsSync was false)
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      'style.css',
-      expect.stringContaining('body')
-    );
-    
-    // Verify it patched the HTML and overwrote the JS
-    // Total writes: 1 for patched HTML, 1 for new CSS, 1 for new JS
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(3);
-    
-    // Check HTML patch content
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      'index.html',
-      expect.stringContaining('<div id="central-terminal-container"></div>')
-    );
-    
-    // Check JS overwrite content
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      'app.js',
-      expect.stringContaining("new CentralTerminal('#central-terminal-container')")
-    );
+    it('should intelligently inject missing elements with --manual', async () => {
+      process.argv = ['node', 'script.js', '--manual', '--dir', '.'];
+      fs.existsSync.mockReturnValue(true);
+      fs.readFileSync.mockReturnValue('<html><body><div id="pseudo-terminal"></div></body></html>');
+      questionMock.mockImplementation((q, cb) => cb(''));
+      await main();
+      const htmlCall = fs.writeFileSync.mock.calls.find(c => c[0].endsWith('index.html'));
+      expect(htmlCall).toBeDefined();
+      const writtenHtml = htmlCall[1];
+      expect(writtenHtml).toContain('<div id="terminalOutput"></div>');
+    });
   });
 
-  test('manual mode should generate a custom app.js with all options', async () => {
-    // Simulate a user choosing channel, 'manual' mode, and providing all custom selectors
-    const questionMock = readline.createInterface().question;
-    questionMock.mockImplementationOnce((q, cb) => cb('lts'));        // Channel
-    questionMock.mockImplementationOnce((q, cb) => cb('manual'));     // Mode
-    questionMock.mockImplementationOnce((q, cb) => cb('#my-term'));   // Container
-    questionMock.mockImplementationOnce((q, cb) => cb('.my-input'));  // Input
-    questionMock.mockImplementationOnce((q, cb) => cb('.my-output')); // Output
-    questionMock.mockImplementationOnce((q, cb) => cb('.my-prompt')); // Prompt
+  describe('Interactive fallback execution', () => {
+    it('should run "new" project setup', async () => {
+      process.argv = ['node', 'script.js'];
+      questionMock
+        .mockImplementationOnce((q, cb) => cb('new'))
+        .mockImplementationOnce((q, cb) => cb('interactive-demo'));
+      await main();
+      const expectedDir = path.resolve(process.cwd(), 'interactive-demo');
+      expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(4);
+    });
 
-    await main(); // Run the script
-
-    // Verify only one file (app.js) was written
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
-
-    // Get the content passed to writeFileSync
-    const writeCallArgs = fs.writeFileSync.mock.calls[0];
-    const filePath = writeCallArgs[0];
-    const fileContent = writeCallArgs[1];
-
-    // Check that it's writing to app.js
-    expect(filePath).toContain('app.js');
-    
-    // Check for all custom selectors in the generated content
-    expect(fileContent).toContain("new CentralTerminal('#my-term'");
-    expect(fileContent).toContain("inputSelector: '.my-input'");
-    expect(fileContent).toContain("outputSelector: '.my-output'");
-    expect(fileContent).toContain("promptSelector: '.my-prompt'");
+    it('should inform user that interactive refactor is not supported', async () => {
+        process.argv = ['node', 'script.js'];
+        questionMock.mockImplementationOnce((q, cb) => cb('refactor'));
+        const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        await main();
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Interactive refactor not supported"));
+        consoleSpy.mockRestore();
+    });
   });
 });

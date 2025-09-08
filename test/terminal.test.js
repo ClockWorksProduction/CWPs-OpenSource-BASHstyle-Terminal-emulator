@@ -1,7 +1,8 @@
 // test/terminal.test.js
 // Comprehensive test suite for CentralTerminal v5.1.3
+import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 
-const {
+import {
   CentralTerminal,
   VOS,
   VFile,
@@ -10,7 +11,7 @@ const {
   EditorAddon,
   RpsAddon,
   TerminalUI
-} = require('../src/terminal');
+} from '../src/terminal.js';
 
 // --- Mock UI ---
 const mockUI = () => ({

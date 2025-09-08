@@ -23,7 +23,7 @@
     "CODE_OF_CONDUCT.md"
   ],
   "scripts": {
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "postinstall": "node bin/cwp-terminal-setup.cjs"
   },
   "repository": {
