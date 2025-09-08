@@ -1,14 +1,7 @@
-// ==========================
-// CentralTerminal v5.0.1 — Client-only, BASH-like web terminal emulator
+// CentralTerminal v5.1.0 — fixed version
 // - POSIX pathing throughout
-// - Better realism: timestamps, overwrite flags, unixy errors
-// - Interactivity: autocomplete, history nav, Ctrl+C, prompt
-// - Persistence: localStorage for VFS + history + cwd
-// - Safe: client-side only; simulated network
-// - Bug fixes and minor improvements from v5.0.0
-// ==========================
+// - Client-side only terminal emulator (virtual FS, simple UI)
 
-// ---------- Utility ----------
 const nowISO = () => new Date().toISOString();
 const deepClone = obj => JSON.parse(JSON.stringify(obj));
 
@@ -42,7 +35,7 @@ class VOS {
     this._seed();
   }
 
-  // ---------- Serialization ----------
+  // Serialization
   toJSON() {
     const encode = node => {
       if (node.kind === 'dir') {
@@ -73,7 +66,7 @@ class VOS {
     return vos;
   }
 
-  // ---------- Helpers ----------
+  // Helpers
   _seed() {
     this.mkdir('/home'); this.mkdir('/bin'); this.mkdir('/etc'); this.mkdir('/docs'); this.mkdir('/media');
     this.mkdir('/media/images'); this.mkdir('/media/audio');
@@ -197,7 +190,7 @@ class VOS {
   ls(path = '.') {
     const dir = this.resolve(path);
     if (!(dir instanceof VDirectory)) return null;
-    return Object.values(dir.children).map(c => c.kind === 'dir' ? c.name+'/' : c.ftype==='exe'?c.name+'*':c.name).sort();
+    return Object.values(dir.children).map(c => c.kind === 'dir' ? c.name + '/' : c.ftype === 'exe' ? c.name + '*' : c.name).sort();
   }
 
   chdir(path) {
@@ -208,327 +201,677 @@ class VOS {
 }
 
 // ---------- Boot Checks ----------
-class BootCheck { constructor(name, fn, description=''){ this.name=name; this.fn=fn; this.description=description; } }
+class BootCheck { constructor(name, fn, description = '') { this.name = name; this.fn = fn; this.description = description; } }
 class BootCheckRegistry {
-  constructor(){ this.checks=[]; }
-  add(check){ this.checks.push(check); }
-  async run(term){
-    let ok=true;
-    for(const c of this.checks){
+  constructor() { this.checks = []; }
+  add(check) { this.checks.push(check); }
+  async run(term) {
+    let ok = true;
+    for (const c of this.checks) {
       term._biosWrite(`Running: ${c.name}... `);
-      try{
+      try {
         const passed = await c.fn();
-        term._biosWriteLine(passed?'<span class="status-ok">OK</span>':'<span class="status-failed">FAILED</span>');
-        if(!passed) ok=false;
-      }catch{
-        term._biosWriteLine('<span class="status-failed">FAILED</span>'); ok=false;
+        term._biosWriteLine(passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>');
+        if (!passed) ok = false;
+      } catch {
+        term._biosWriteLine('<span class="status-failed">FAILED</span>'); ok = false;
       }
     }
     return ok;
   }
 }
 
-// ---------- Addons ----------
-class Addon{ constructor(name){ this.name=name; this.term=null; } init(term){ this.term=term; } }
+// ---------- Addon System (New) ----------
+class Addon {
+  constructor(name) {
+    if (!name) throw new Error("Addon must have a name.");
+    this.name = name;
+    this.term = null;
+    this.vOS = null;
+    this.commands = {}; // Each addon has its own commands
 
-// ---------- Central Terminal ----------
-class CentralTerminal {
-  constructor(ui){
-    this.version='5.0.1';
-    this.ui=ui;
-    this.vOS=new VOS();
-    this.history=[];
-    this.historyIndex=-1;
-    this.commands={};
-    this.editor={isActive:false,_buffer:'',lines:[],filePath:null,dirty:false};
-    this.rps={isActive:false,player:0,cpu:0,rounds:0};
-    this.addons={active:false,handle:null};
-    this.commandHistory = [];
-    this.bootRegistry=new BootCheckRegistry();
-    this._registerDefaultCommands();
+    // Add default commands common to all addons
+    this.addCommand('exit', 'Exit the current addon', () => this.exit());
+    this.addCommand('help', 'Show help for this addon', () => {
+        this.term._print(`Available commands within '${this.name}':\\n`);
+        const longest = Math.max(...Object.keys(this.commands).map(n => n.length));
+        Object.values(this.commands)
+          .sort((a,b) => a.name.localeCompare(b.name))
+          .forEach(c => this.term._print(`${c.name.padEnd(longest)} - ${c.desc}`));
+    });
   }
 
-  _print(text){ this.ui.appendTerminalOutput(text); }
-  _biosWrite(text){ this.ui.appendTerminalOutput(text,false); }
-  _biosWriteLine(text){ this.ui.appendTerminalOutput(text,true); }
-  clear(){ this.ui.clearTerminal(); }
-  prompt(){ return '$'; }
-  _saveHistory(){ localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
-  _saveState(){ localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
-
-  addCommand(cmd){ this.commands[cmd.name]=cmd; }
-
-  runCommand(rawInput){
-    const input = rawInput.trim();
-    if(!input) return;
-
-    // prompt echo
-    this._print(`${this.prompt()} ${input}`);
-
-    // history (avoid dup consecutive)
-    if(this.commandHistory[this.commandHistory.length-1] !== input) {
-      this.commandHistory.push(input); this._saveHistory();
-    }
-
-    // modes
-    if(this.editor.isActive) { this._editorHandle(input); return; }
-    if(this.rps.isActive) { this._rpsHandle(input); return; }
-
-    // history expansion !n
-    if (input.startsWith('!')) {
-      const idx = parseInt(input.slice(1),10)-1;
-      const cmd = this.commandHistory[idx];
-      if (cmd) this.runCommand(cmd); else this._print('bash: history: invalid index');
-      return;
-    }
-
-    // addon active
-    if(this.addons.active) { this.addons.handle(input); return; }
-
-    // parse command
-    const parts = input.match(/(?:[^\s\"]+|\"[^\"]*\")+/g) || [];
-    const name = (parts.shift()||'').replace(/\"/g,'').toLowerCase();
-    const args = parts.map(a=>a.replace(/\"/g,''));
-    const cmd = this.commands[name];
-    if (!cmd) { this._print(`bash: ${name}: command not found`); return; }
-    cmd.execute(args, this);
+  // Add a command to the addon
+  addCommand(name, desc, exec) {
+      this.commands[name] = { name, desc, execute: exec };
   }
 
-  // ---------- Default Commands ----------
-  _registerDefaultCommands() {
-    const cmd = (name, desc, exec) => ({ name, desc, execute: exec });
-  
-    // ---- Basic Navigation ----
-    this.addCommand(cmd('ls', 'list files', args => {
-      const files = this.vOS.ls(args[0] || '.');
-      this._print(files ? files.join(' ') : 'ls: cannot access');
-    }));
-    this.addCommand(cmd('cd', 'change directory', args => {
-      const ok = this.vOS.chdir(args[0] || this.vOS.homePath);
-      if (!ok) this._print(`cd: ${args[0]}: No such directory`);
-    }));
-    this.addCommand(cmd('pwd', 'print working directory', () => this._print(this.vOS.pathOf(this.vOS.cwd))));
-  
-    // ---- File management ----
-    this.addCommand(cmd('mkdir', 'make directory', args => {
-      if (!args[0]) { this._print('usage: mkdir <dir>'); return; }
-      if (!this.vOS.mkdir(args[0])) this._print(`mkdir: cannot create directory '${args[0]}'`);
-    }));
-    this.addCommand(cmd('rmdir', 'remove empty directory', args => {
-      if (!args[0]) { this._print('usage: rmdir <dir>'); return; }
-      if (!this.vOS.rmdir(args[0])) this._print(`rmdir: failed to remove '${args[0]}'`);
-    }));
-    this.addCommand(cmd('rm', 'remove file', args => {
-      if (!args[0]) { this._print('usage: rm <file>'); return; }
-      const path = this.vOS.normalize(args[0]);
-      if (!this.vOS.unlink(path)) this._print(`rm: cannot remove '${args[0]}'`);
-    }));    
-    this.addCommand(cmd('cp', 'copy file', args => {
-      const [src, dest] = args;
-      if (!src || !dest) { this._print('usage: cp <src> <dest>'); return; }
-      const srcPath = this.vOS.normalize(src);
-      const destPath = this.vOS.normalize(dest);
-      const node = this.vOS.resolve(srcPath);
-      if (!(node instanceof VFile)) { this._print(`cp: cannot copy '${src}'`); return; }
-      if (!this.vOS.writeFile(destPath, node.content, node.ftype, true)) this._print(`cp: cannot write to '${dest}'`);
-    }));
+  // Internal initialization
+  _init(term, vOS) {
+    this.term = term;
+    this.vOS = vOS;
+  }
+
+  // Called when addon starts. To be overridden by subclasses.
+  onStart(args) {}
+
+  // Handles input, parsing it into commands for the addon.
+  handleCommand(input) {
+    const parts = input.match(/[^\s"']+|"([^"]*)"|'([^']*)'/g) || [];
+    if (!parts) return;
     
-    this.addCommand(cmd('mv', 'move/rename file', args => {
-      const [src, dest] = args;
-      if (!src || !dest) { this._print('usage: mv <src> <dest>'); return; }
-      const srcPath = this.vOS.normalize(src);
-      const destPath = this.vOS.normalize(dest);
-      const node = this.vOS.resolve(srcPath);
-      if (!node) { this._print(`mv: cannot stat '${src}'`); return; }
-      if (!this.vOS.writeFile(destPath, node.content || '', node.ftype, true)) { this._print(`mv: cannot move to '${dest}'`); return; }
-      if (!this.vOS.unlink(srcPath)) this._print(`mv: cannot remove '${src}' after move`);
-    }));    
-    this.addCommand(cmd('touch', 'create empty file', args => {
-      if (!args[0]) { this._print('usage: touch <file>'); return; }
-      this.vOS.writeFile(args[0], '', 'text', true);
-    }));
-    this.addCommand(cmd('cat', 'print file contents', args => {
-      const content = this.vOS.readFile(args[0]);
-      if (content === null) this._print(`cat: ${args[0]}: No such file`);
-      else this._print(content);
-    }));
-    this.addCommand(cmd('head', 'first N lines of a file', args => {
-      const f = args[0]; const n = parseInt(args[1]||'10',10);
-      const node = this.vOS.resolve(f);
-      if (!node || !(node instanceof VFile)) { this._print(`head: cannot open '${f}'`); return; }
-      node.content.split('\n').slice(0,n).forEach(l=>this._print(l));
-    }));
-    this.addCommand(cmd('tail', 'last N lines of a file', args => {
-      const f = args[0]; const n = parseInt(args[1]||'10',10);
-      const node = this.vOS.resolve(f);
-      if (!node || !(node instanceof VFile)) { this._print(`tail: cannot open '${f}'`); return; }
-      node.content.split('\n').slice(-n).forEach(l=>this._print(l));
-    }));
-    this.addCommand(cmd('ln', 'create symbolic link (mock)', args => {
-      this._print('ln: symbolic links not fully implemented in VFS');
-    }));
-    this.addCommand(cmd('find', 'find files/directories (mock)', args => {
-      this._print('find: recursive search not implemented');
-    }));
-    this.addCommand(cmd('chmod', 'change file permissions (mock)', args => {
-      this._print('chmod: permission change simulated');
-    }));
-    this.addCommand(cmd('chown', 'change file owner (mock)', args => {
-      this._print('chown: ownership simulated');
-    }));
-    this.addCommand(cmd('chgrp', 'change group (mock)', args => {
-      this._print('chgrp: group change simulated');
-    }));
-    this.addCommand(cmd('umask', 'show umask', args => {
-      this._print('umask: 022');
-    }));
-  
-    // ---- Process / system ----
-    this.addCommand(cmd('ps', 'list processes (mock)', args => this._print('PID TTY TIME CMD\n1 pts/0 00:00 bash\n2 pts/0 00:00 node')));
-    this.addCommand(cmd('top', 'process monitor (mock)', args => this._print('Top: simulated')));
-    this.addCommand(cmd('kill', 'kill process (mock)', args => this._print('kill: simulated')));
-    this.addCommand(cmd('pkill', 'kill by name (mock)', args => this._print('pkill: simulated')));
-    this.addCommand(cmd('pgrep', 'find process by name (mock)', args => this._print('pgrep: simulated')));
-    this.addCommand(cmd('grep', 'search pattern in file', args => {
-      const [p,f] = args; if(!p||!f){ this._print('usage: grep <pattern> <file>'); return; }
-      const node = this.vOS.resolve(f); if(!node || !(node instanceof VFile)){ this._print(`grep: ${f}: No such file`); return; }
-      const re = new RegExp(p); node.content.split('\n').forEach(l=>{ if(re.test(l)) this._print(l); });
-    }));
-  
-    // ---- System Info ----
-    this.addCommand(cmd('uname', 'system information', () => this._print('CentralTerminal OS v5.0.1')));
-    this.addCommand(cmd('whoami', 'current user', () => this._print('user')));
-    this.addCommand(cmd('df', 'disk usage', () => this._print('/dev/vfs 1024M 512M 512M 50% /')));
-    this.addCommand(cmd('du', 'directory usage', () => this._print('docs/ 4K\nhome/user/ 8K')));
-    this.addCommand(cmd('free', 'memory info', () => this._print('Mem: total 1024MB used 512MB free 512MB')));
-    this.addCommand(cmd('uptime', 'system uptime', () => this._print('up 1 day, 3:45')));
-  
-    // ---- Editor / fun ----
-    this.addCommand(cmd('vim', 'shortcut to editor', args => {
-      if (!args[0]) { this._print('usage: vim <file>'); return; }
-      this._editorStart(args[0]);
-    }));
-    this.addCommand(cmd('edit', 'edit file', args => {
-      if (!args[0]) { this._print('usage: edit <file>'); return; }
-      this._editorStart(args[0]);
-    }));
-    this.addCommand(cmd('rps', 'play rock-paper-scissors', () => this._rpsStart()));
-    this.addCommand(cmd('tree', 'show directory tree', args => {
-      const dir = this.vOS.resolve(args[0]||'.');
-      if (!(dir instanceof VDirectory)) { this._print(`tree: ${args[0]}: No such directory`); return; }
-      this._tree(dir,'');
-    }));
-  
-    // ---- Utilities ----
-    this.addCommand(cmd('echo', 'echo arguments', args => this._print(args.join(' '))));
-    this.addCommand(cmd('history', 'command history', () => this.commandHistory.forEach((h,i)=>this._print(`${i+1}  ${h}`))));
-    this.addCommand(cmd('date', 'current date/time', () => this._print(new Date().toString())));
-    this.addCommand(cmd('clear', 'clear terminal screen', () => this.clear()));
-    this.addCommand(cmd('run', 'run command (alias)', args => this.runCommand(args.join(' '))));
-    this.addCommand(cmd('exit', 'exit terminal', () => this._print('Exiting terminal...')));
-    this.addCommand(cmd('ping', 'ping host (mock)', args => this._print(`PING ${args[0]||'localhost'}: 32 bytes`)));
-    this.addCommand(cmd('curl', 'fetch URL (mock)', args => this._print(`curl: fetched ${args[0]||'http://example.com'}`)));
-    this.addCommand(cmd('help', 'show help', () => Object.values(this.commands).forEach(c => this._print(`${c.name} - ${c.desc}`))));
+    const name = (parts.shift() || '').replace(/['"]/g, '').toLowerCase();
+    const args = parts.map(a => a.replace(/['"]/g, ''));
 
-    // ---- Fun / Visual ----
-    this.addCommand(cmd('aafire', 'ASCII fire animation', async () => {
-      this._print('Starting ASCII fire... Press Ctrl+C to stop.');
-      const fireFrames = [
-        "  (  )   (   )  ",
-        " (    ) (     ) ",
-        "  )  (   )  (   ",
-        " (    ) (     ) ",
-        "  (  )   (   )  "
-      ];
-      let running = true;
-      const stop = () => running = false;
-      this.ui.registerCtrlC(stop); // hypothetical Ctrl+C handler
-      while (running) {
-        for (const frame of fireFrames) {
-          if (!running) break;
-          this._print(frame);
-          await new Promise(r => setTimeout(r, 200));
-        }
-      }
-      this._print('ASCII fire stopped.');
-    }));
-
-    this.addCommand(cmd('cmatrix', 'Matrix-style falling text', async () => {
-      this._print('Starting Matrix... Press Ctrl+C to stop.');
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*';
-      const width = 30;
-      let running = true;
-      const stop = () => running = false;
-      this.ui.registerCtrlC(stop);
-      while (running) {
-        const line = Array.from({length: width}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
-        this._print(line);
-        await new Promise(r => setTimeout(r, 100));
-      }
-      this._print('Matrix stopped.');
-    }));
-
-  }   
-
-  // ---------- Interactive Editor ----------
-  _editorStart(path){
-    this.editor.isActive=true;
-    this.editor.filePath=this.vOS.normalize(path);
-    const node = this.vOS.resolve(path);
-    this.editor.lines = (node instanceof VFile ? node.content : '').split('\n');
-    this.editor.dirty=false;
-    this.clear();
-    this._print(`Editing "${this.editor.filePath}". Type and press Enter to add a line.`);
-    this._print('Commands: :w (save), :q (quit), :wq (save & quit)');
-    this.editor.lines.forEach((line,i)=>this._print(`${String(i+1).padStart(3)}  ${line}`));
-  }
-  _editorHandle(input){
-    if(input.startsWith(':')){
-      const cmd = input.substring(1);
-      if(cmd==='w'){ this._editorSave(); }
-      else if(cmd==='q'){ if(this.editor.dirty)this._print('Unsaved changes. Use :w or :wq.'); else this._editorStop(); }
-      else if(cmd==='wq'){ this._editorSave(); this._editorStop(); }
-      else this._print(`Unknown editor command: ${cmd}`);
-      return;
+    const cmd = this.commands[name];
+    if (cmd) {
+      cmd.execute(args, this.term, this.vOS);
+    } else if (name) {
+      this.term._print(`${this.name}: ${name}: command not found`);
     }
-    this.editor.lines.push(input); this.editor.dirty=true; this._print(`${String(this.editor.lines.length).padStart(3)}  ${input}`);
   }
-  _editorSave(){ const content=this.editor.lines.join('\n'); if(!this.vOS.writeFile(this.editor.filePath,content,'text',true)){ this._print('Error: could not save.'); return; } this.editor.dirty=false; this._print('File saved.'); this._saveState(); }
-  _editorStop(){ this.editor.isActive=false; this.editor.lines=[]; this.editor.filePath=null; this.editor.dirty=false; this.clear(); this._print('Returned to main terminal.'); }
 
-  // ---------- RPS ----------
-  _rpsStart(){ this.rps.isActive=true; this.rps.player=0; this.rps.cpu=0; this.rps.rounds=0; this.clear(); this._print('--- Rock, Paper, Scissors ---'); this._print("Type: 'rock', 'paper', or 'scissors'. 'score' to view, 'exit' to quit."); }
-  _rpsHandle(input){ const s=input.trim().toLowerCase(); if(s==='exit'){ this._rpsStop(); return; } if(s==='score'){ this._rpsScore(); return; } if(!['rock','paper','scissors'].includes(s)){ this._print('Invalid choice.'); return; } const opts=['rock','paper','scissors']; const cpu=opts[Math.floor(Math.random()*3)]; this._print(`> You: ${s} | Computer: ${cpu}`); if(s===cpu)this._print("It's a tie!"); else if((s==='rock'&&cpu==='scissors')||(s==='paper'&&cpu==='rock')||(s==='scissors'&&cpu==='paper')){ this._print('You win this round!'); this.rps.player++; } else { this._print('Computer wins this round.'); this.rps.cpu++; } this.rps.rounds++; this._print('---'); }
-  _rpsScore(){ this._print('-- Score --'); this._print(`Player: ${this.rps.player}`); this._print(`Computer: ${this.rps.cpu}`); this._print(`Rounds: ${this.rps.rounds}`); this._print('-----------'); }
-  _rpsStop(){ this.rps.isActive=false; this.clear(); this._print('Thanks for playing!'); this._rpsScore(); }
+  // Called when addon stops. To be overridden.
+  onStop() {}
 
-  // ---------- Autocomplete ----------
-  _autoComplete(){
-    const text=this.input.value;
-    if(!text.trim()) return;
-    const parts=text.match(/(?:[^\s\"]+|\"[^\"]*\")+/g)||[];
-    const last=parts[parts.length-1]||'';
-    const isPathy=last.startsWith('/')||last.startsWith('.')||last.startsWith('~');
-
-    if(parts.length===1&&!isPathy){
-      const all=[...new Set(Object.values(this.commands))].map(c=>c.name);
-      const matches=all.filter(n=>n.startsWith(last));
-      if(matches.length===1)this.input.value=matches[0]+' ';
-      else if(matches.length>1)this._print(matches.join('  '));
-      return;
+  // Exits the addon, returning control to the main terminal.
+  exit() {
+    if (this.term && this.term.addonExecutor.activeAddon === this) {
+      this.term.addonExecutor.stop();
     }
-
-    const before=parts.slice(0,-1).join(' ');
-    const path=last;
-    const norm=this.vOS.normalize(path);
-    const dirPath=norm.endsWith('/')?norm:norm.slice(0,norm.lastIndexOf('/')+1);
-    const base=norm.slice(dirPath.length);
-    const dir=this.vOS.resolve(dirPath||'.');
-    if(!(dir instanceof VDirectory)) return;
-    const ents=Object.keys(dir.children).filter(n=>n.startsWith(base));
-    if(ents.length===1){ const comp=dirPath+ents[0]; const node=dir.children[ents[0]]; const suffix=node instanceof VDirectory?'/':' '; this.input.value=(before?before+' ':'')+comp+suffix; }
-    else if(ents.length>1)this._print(ents.join('  '));
   }
 }
 
-export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, VFile, VDirectory, VOS };
+// --- New Addon Implementations ---
+class EditorAddon extends Addon {
+    constructor() {
+        super('edit');
+        this.filePath = null;
+        this.lines = [];
+        this.isDirty = false;
+    }
+
+    onStart(args) {
+        this.filePath = this.vOS.normalize(args[0] || 'untitled.txt');
+        const content = this.vOS.readFile(this.filePath);
+
+        // CORRECTED LINE:
+        // If content is null (a new file), start with an empty array.
+        // Otherwise, split the content. This prevents the initial blank line.
+        this.lines = content === null ? [] : content.split('\n');
+
+        this.isDirty = false;
+        
+        this.term.clear();
+        this.term._print(`Editing "${this.filePath}".`);
+        this.term._print('Enter text to add lines. Commands: :w (save), :q (quit), :wq (save & quit)');
+        
+        // Display existing lines if there are any
+        if (this.lines.length > 0) {
+            this.lines.forEach((line, i) => this.term._print(`${String(i + 1).padStart(3)}  ${line}`));
+        }
+    }
+    
+    // Override default command handling for special editor logic
+    handleCommand(input) {
+        if (input.startsWith(':')) {
+            const cmd = input.substring(1).toLowerCase();
+            switch (cmd) {
+                case 'w': this.saveFile(); break;
+                case 'q':
+                    if (this.isDirty) this.term._print('Warning: Unsaved changes. Use :q! or :wq.');
+                    else this.exit();
+                    break;
+                case 'q!': this.exit(); break;
+                case 'wq': this.saveFile(); this.exit(); break;
+                default: this.term._print(`Unknown editor command: ${cmd}`);
+            }
+        } else {
+            this.lines.push(input);
+            this.isDirty = true;
+            this.term._print(`${String(this.lines.length).padStart(3)}  ${input}`);
+        }
+    }
+
+    saveFile() {
+        const content = this.lines.join('\n');
+        if (this.vOS.writeFile(this.filePath, content, 'text', true)) {
+            this.isDirty = false;
+            this.term._print('File saved.');
+            this.term._saveState();
+        } else {
+            this.term._print('Error: Could not save file.');
+        }
+    }
+
+    onStop() {
+        this.term.clear();
+        this.term._print('Returned to main terminal.');
+    }
+}
+
+class RpsAddon extends Addon {
+    constructor() {
+        super('rps');
+        this.player = 0;
+        this.cpu = 0;
+        this.rounds = 0;
+
+        // Register addon-specific commands
+        this.addCommand('rock', 'Choose rock', () => this.play('rock'));
+        this.addCommand('paper', 'Choose paper', () => this.play('paper'));
+        this.addCommand('scissors', 'Choose scissors', () => this.play('scissors'));
+        this.addCommand('score', 'View the current score', () => this.showScore());
+    }
+
+    onStart() {
+        this.term.clear();
+        this.term._print('--- Rock, Paper, Scissors ---');
+        this.commands.help.execute(); // Show rps-specific help
+        this.player = 0; this.cpu = 0; this.rounds = 0;
+    }
+
+    play(playerChoice) {
+        const choices = ['rock', 'paper', 'scissors'];
+        const cpuChoice = choices[Math.floor(Math.random() * 3)];
+        this.term._print(`> You: ${playerChoice} | Computer: ${cpuChoice}`);
+
+        if (playerChoice === cpuChoice) {
+            this.term._print("It's a tie!");
+        } else if ((playerChoice === 'rock' && cpuChoice === 'scissors') || (playerChoice === 'paper' && cpuChoice === 'rock') || (playerChoice === 'scissors' && cpuChoice === 'paper')) {
+            this.term._print('You win!'); this.player++;
+        } else {
+            this.term._print('Computer wins.'); this.cpu++;
+        }
+        this.rounds++;
+        this.term._print('---');
+    }
+
+    showScore() {
+        this.term._print(`-- Score: Player ${this.player} - ${this.cpu} CPU (${this.rounds} rounds) --`);
+    }
+    
+    onStop() {
+        this.term.clear();
+        this.term._print('Thanks for playing!');
+        this.showScore();
+    }
+}
+
+class AddonExecutor {
+  constructor(term, vOS) {
+    this.term = term;
+    this.vOS = vOS;
+    this.registered = {};
+    this.activeAddon = null;
+  }
+
+  register(addonInstance) {
+    if (!(addonInstance instanceof Addon)) {
+      console.error("Attempted to register invalid addon.", addonInstance);
+      return;
+    }
+    addonInstance._init(this.term, this.vOS);
+    this.registered[addonInstance.name] = addonInstance;
+  }
+
+  start(name, args) {
+    const addon = this.registered[name];
+    if (!addon) {
+      this.term._print(`bash: ${name}: addon not found`);
+      return;
+    }
+    this.activeAddon = addon;
+    this.activeAddon.onStart(args);
+    this.term.ui.setPrompt(this.term.prompt());
+  }
+
+  stop() {
+    if (!this.activeAddon) return;
+    const addon = this.activeAddon;
+    this.activeAddon = null; // Set to null *before* onStop to prevent re-entry issues
+    addon.onStop();
+    this.term.ui.setPrompt(this.term.prompt());
+  }
+
+  handleCommand(input) {
+    if (this.activeAddon) {
+      this.term.ui.appendTerminalOutput(`${this.term.prompt()}${input}`);
+      this.activeAddon.handleCommand(input);
+      return true;
+    }
+    return false;
+  }
+
+  isActive() { return !!this.activeAddon; }
+}
+
+// ---------- Terminal UI Handler ----------
+class TerminalUI {
+  // onCommand(command) : function to call on Enter
+  // onAutocomplete() : function to call on Tab
+  
+  constructor(containerSelector, onCommand, onAutocomplete = null) {
+    const container = document.querySelector(containerSelector);
+    if (!container) throw new Error(`Terminal container element not found: ${containerSelector}`);
+
+    this.container = container;
+    this.container.style.fontFamily = 'monospace';
+    this.container.style.backgroundColor = 'black';
+    this.container.style.color = '#eee';
+    this.container.style.padding = '5px';
+    this.container.innerHTML = '';
+
+    this.onCommand = onCommand;
+    this.onAutocomplete = onAutocomplete;
+    this._ctrlCHandler = null;
+
+    // 1. Create output area
+    this.output = document.createElement('div');
+
+    // 2. Create input line
+    const inputLine = document.createElement('div');
+    this.prompt = document.createElement('span');
+    this.input = document.createElement('input');
+    this.input.type = 'text';
+    this.input.style.background = 'transparent';
+    this.input.style.border = 'none';
+    this.input.style.color = 'inherit';
+    this.input.style.fontFamily = 'inherit';
+    this.input.style.width = '80%';
+    this.input.setAttribute('autofocus', 'true');
+
+    inputLine.appendChild(this.prompt);
+    inputLine.appendChild(this.input);
+
+    // 3. Add to container
+    this.container.appendChild(this.output);
+    this.container.appendChild(inputLine);
+
+    // 4. Wire up the command handler
+    this.input.addEventListener('keydown', (e) => {
+      // Ctrl+C handling
+      if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (typeof this._ctrlCHandler === 'function') this._ctrlCHandler();
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        const command = this.input.value;
+        this.input.value = '';
+        if (typeof this.onCommand === 'function') this.onCommand(command);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (typeof this.onAutocomplete === 'function') this.onAutocomplete();
+      }
+    });
+
+    // Focus the input when terminal is clicked
+    this.container.addEventListener('click', () => this.input.focus());
+    this.input.focus();
+  }
+
+  clearTerminal() { this.output.innerHTML = ''; }
+
+  appendTerminalOutput(text, isLine = true) {
+    const element = document.createElement('div');
+    element.innerHTML = text;
+    this.output.appendChild(element);
+    // Auto-scroll to the bottom
+    this.container.scrollTop = this.container.scrollHeight;
+  }
+
+  setPrompt(promptText) { this.prompt.innerHTML = promptText; }
+
+  registerCtrlC(handler) { this._ctrlCHandler = handler; }
+}
+
+// ---------- Central Terminal ----------
+class CentralTerminal {
+  constructor(containerOrUI) {
+    this.version = '5.1.0';
+
+    if (typeof containerOrUI === 'string') {
+      this.ui = new TerminalUI(containerOrUI, this.runCommand.bind(this), this._autoComplete.bind(this));
+    } else {
+      this.ui = containerOrUI;
+    }
+
+    this.vOS = new VOS();
+    this.commandHistory = [];
+    this.historyIndex = -1;
+    this.commands = {};
+    // this.editor and this.rps are now obsolete and have been removed.
+    this.addonExecutor = new AddonExecutor(this, this.vOS);
+    this.bootRegistry = new BootCheckRegistry();
+    this._registerDefaultCommands();
+  }
+
+  // --- Core Methods ---
+  _print(text) { this.ui.appendTerminalOutput(text); }
+  _biosWrite(text) { this.ui.appendTerminalOutput(text, false); }
+  _biosWriteLine(text) { this.ui.appendTerminalOutput(text, true); }
+  clear() { this.ui.clearTerminal(); }
+  prompt() {
+    if (this.addonExecutor.isActive()) {
+        return `(${this.addonExecutor.activeAddon.name})> `;
+    }
+    return '$ ';
+}
+  _saveHistory() { localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
+  _saveState() { localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
+
+  // --- Addon Management ---
+  registerAddon(addonInstance) { this.addonExecutor.register(addonInstance); }
+  addCommand(cmd) { this.commands[cmd.name] = cmd; }
+
+  // --- Main Command Runner (REPLACE THIS METHOD) ---
+  async runCommand(rawInput) {
+    const input = String(rawInput || '').trim();
+
+    // This part now correctly handles addon input and exits early.
+    if (this.addonExecutor.handleCommand(input)) {
+        return;
+    }
+
+    // This handles empty commands sent to the main terminal.
+    if (!input) {
+        this.ui.setPrompt(this.prompt());
+        return;
+    }
+    
+    // Echo the command to the terminal UI.
+    this.ui.appendTerminalOutput(`${this.prompt()}${input}`);
+
+    // Save to history.
+    if (this.commandHistory[this.commandHistory.length - 1] !== input) {
+      this.commandHistory.push(input);
+      this._saveHistory();
+    }
+
+    // Parse the command and its arguments.
+    const parts = input.match(/[^\s"']+|"([^"]*)"|'([^']*)'/g) || [];
+    const name = (parts.shift() || '').replace(/['"]/g, '').toLowerCase();
+    const args = parts.map(a => a.replace(/['"]/g, ''));
+
+    const cmd = this.commands[name];
+    if (!cmd) {
+      this._print(`bash: ${name}: command not found`);
+      return;
+    }
+    
+    // The 'await' here is the crucial fix for async commands.
+    await cmd.execute(args, this);
+    this._saveState();
+  }
+
+
+  // --- Boot Sequence ---
+  async boot() {
+    this.clear();
+    this._biosWriteLine('CWP Open Terminal BIOS v5.1.0');
+    this._biosWriteLine('-----------------------------------');
+
+    this.bootRegistry.add(new BootCheck('Loading saved session', () => {
+      try {
+        const vosData = localStorage.getItem('cterm_vos');
+        if (vosData) this.vOS = VOS.fromJSON(JSON.parse(vosData));
+        const historyData = localStorage.getItem('cterm_history');
+        if (historyData) this.commandHistory = JSON.parse(historyData);
+        return true;
+      } catch (e) {
+        console.error("Failed to load session:", e);
+        return true; // Don't block boot on corrupted save
+      }
+    }));
+
+    const bootSuccess = await this.bootRegistry.run(this);
+
+    if (bootSuccess) {
+      this._biosWriteLine('\\nSystem ready. Launching terminal...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      this.clear();
+      const motd = this.vOS.readFile('/etc/motd');
+      if (motd) this._print(motd);
+      this.ui.setPrompt(this.prompt()); // Set initial prompt
+    } else {
+      this._biosWriteLine('\\n<span class="status-failed">A critical error occurred. System halted.</span>');
+    }
+  }
+
+  // ---------- Default Commands (REPLACE THIS METHOD) ----------
+  _registerDefaultCommands() {
+    const cmd = (name, desc, exec) => ({ name, desc, execute: exec });
+
+    // --- Addon Aliases & Runner ---
+    this.addCommand(cmd('run', 'run a registered addon', (args, term) => {
+        const addonName = args.shift();
+        if (!addonName) {
+            term._print('usage: run <addon_name> [args...]');
+            return;
+        }
+        term.addonExecutor.start(addonName, args);
+        term.ui.setPrompt(term.prompt());
+    }));
+    this.addCommand(cmd('edit', 'edit a file using the text editor addon', (args, term) => {
+        term.runCommand(`run edit ${args.join(' ')}`);
+    }));
+    this.addCommand(cmd('vim', 'alias for the edit command', (args, term) => {
+        term.runCommand(`run edit ${args.join(' ')}`);
+    }));
+    this.addCommand(cmd('rps', 'play rock-paper-scissors', (args, term) => {
+        term.runCommand('run rps');
+    }));
+
+    // --- Filesystem (with fixes) ---
+    this.addCommand(cmd('ls', 'list files', args => {
+      const files = this.vOS.ls(args[0] || '.');
+      if (files === null) this._print(`ls: cannot access '${args[0] || '.'}'`);
+      else if (files.length > 0) this._print(files.join('  '));
+      else this._print('');
+    }));
+    this.addCommand(cmd('cd', 'change directory', args => {
+      if (!this.vOS.chdir(args[0] || this.vOS.homePath)) this._print(`cd: ${args[0]}: No such directory`);
+    }));
+    this.addCommand(cmd('pwd', 'print working directory', () => this._print(this.vOS.pathOf(this.vOS.cwd))));
+    
+    // UPDATED MKDIR: Now supports -p flag for the 'tree' test
+    this.addCommand(cmd('mkdir', 'make directory', args => {
+      const pathArg = args.filter(a => !a.startsWith('-')).pop();
+      const pFlag = args.includes('-p');
+      if (!pathArg) { this._print('usage: mkdir [-p] <dir>'); return; }
+      
+      const success = pFlag ? this.vOS._mkdirp(pathArg) : this.vOS.mkdir(pathArg);
+      if (!success) this._print(`mkdir: cannot create directory '${pathArg}'`);
+    }));
+
+    this.addCommand(cmd('rmdir', 'remove empty directory', args => {
+      if (!args[0]) this._print('usage: rmdir <dir>');
+      else if (!this.vOS.rmdir(args[0])) this._print(`rmdir: failed to remove '${args[0]}'`);
+    }));
+    this.addCommand(cmd('rm', 'remove file', args => {
+      if (!args[0]) this._print('usage: rm <file>');
+      else if (!this.vOS.unlink(this.vOS.normalize(args[0]))) this._print(`rm: cannot remove '${args[0]}'`);
+    }));
+    this.addCommand(cmd('cp', 'copy file', args => {
+      const [src, dest] = args;
+      if (!src || !dest) { this._print('usage: cp <src> <dest>'); return; }
+      const node = this.vOS.resolve(src);
+      if (!(node instanceof VFile)) { this._print(`cp: cannot copy '${src}'`); return; }
+      if (!this.vOS.writeFile(dest, node.content, node.ftype, true)) this._print(`cp: cannot write to '${dest}'`);
+    }));
+    this.addCommand(cmd('mv', 'move/rename file', args => {
+      const [src, dest] = args;
+      if (!src || !dest) { this._print('usage: mv <src> <dest>'); return; }
+      const node = this.vOS.resolve(src);
+      if (!node) { this._print(`mv: cannot stat '${src}'`); return; }
+      if (!this.vOS.writeFile(dest, node.content || '', node.ftype, true)) { this._print(`mv: cannot move to '${dest}'`); return; }
+      this.vOS.unlink(src);
+    }));
+    this.addCommand(cmd('touch', 'create empty file', args => {
+      if (!args[0]) this._print('usage: touch <file>');
+      else this.vOS.writeFile(args[0], '', 'text', false);
+    }));
+    this.addCommand(cmd('cat', 'print file contents', args => {
+      const content = this.vOS.readFile(args[0]);
+      this._print(content === null ? `cat: ${args[0]}: No such file` : content);
+    }));
+
+    // UPDATED HEAD: Correctly parses arguments and slices content
+    this.addCommand(cmd('head', 'first N lines of a file', args => {
+        const f = args[0]; const n = parseInt(args[1] || '10', 10);
+        if (!f) { this._print('usage: head <file> [lines]'); return; }
+        const node = this.vOS.resolve(f);
+        if (!node || !(node instanceof VFile)) { this._print(`head: cannot open '${f}'`); return; }
+        this._print(node.content.split('\n').slice(0, n).join('\n'));
+    }));
+
+    // UPDATED TAIL: Correctly parses arguments and slices content
+    this.addCommand(cmd('tail', 'last N lines of a file', args => {
+        const f = args[0]; const n = parseInt(args[1] || '10', 10);
+        if (!f) { this._print('usage: tail <file> [lines]'); return; }
+        const node = this.vOS.resolve(f);
+        if (!node || !(node instanceof VFile)) { this._print(`tail: cannot open '${f}'`); return; }
+        this._print(node.content.split('\n').slice(-n).join('\n'));
+    }));
+
+    this.addCommand(cmd('tree', 'show directory tree', args => {
+      const dir = this.vOS.resolve(args[0] || '.');
+      if (!(dir instanceof VDirectory)) { this._print(`tree: ${args[0]}: No such directory`); return; }
+      this._print(dir.name || '/');
+      this._tree(dir, '');
+    }));
+    
+    // UPDATED GREP: Properly prints matching lines
+    this.addCommand(cmd('grep', 'search pattern in file', args => {
+      const [p, f] = args; if (!p || !f) { this._print('usage: grep <pattern> <file>'); return; }
+      const node = this.vOS.resolve(f); if (!node || !(node instanceof VFile)) { this._print(`grep: ${f}: No such file`); return; }
+      const re = new RegExp(p, 'g');
+      const matches = node.content.split('\n').filter(l => re.test(l));
+      if (matches.length > 0) this._print(matches.join('\n'));
+    }));
+
+    // --- Mock FS Commands ---
+    this.addCommand(cmd('ln', 'create symbolic link (mock)', () => this._print('ln: symbolic links not implemented')));
+    this.addCommand(cmd('find', 'find files/directories (mock)', () => this._print('find: not implemented')));
+    this.addCommand(cmd('chmod', 'change file permissions (mock)', () => this._print('chmod: permission change simulated')));
+    this.addCommand(cmd('chown', 'change file owner (mock)', () => this._print('chown: ownership simulated')));
+    this.addCommand(cmd('chgrp', 'change group (mock)', () => this._print('chgrp: group change simulated')));
+    this.addCommand(cmd('umask', 'show umask', () => this._print('022')));
+
+    // --- Process / System (Mocks) ---
+    this.addCommand(cmd('ps', 'list processes (mock)', () => this._print('PID TTY TIME CMD\\n1 pts/0 00:00 bash')));
+    this.addCommand(cmd('top', 'process monitor (mock)', () => this._print('Top: simulated')));
+    this.addCommand(cmd('kill', 'kill process (mock)', () => this._print('kill: simulated')));
+    this.addCommand(cmd('pkill', 'kill by name (mock)', () => this._print('pkill: simulated')));
+    this.addCommand(cmd('pgrep', 'find process by name (mock)', () => this._print('pgrep: simulated')));
+    
+    // --- System Info ---
+    this.addCommand(cmd('uname', 'system information', () => this._print(`CentralTerminal OS v${this.version}`)));
+    this.addCommand(cmd('whoami', 'current user', () => this._print('user')));
+    this.addCommand(cmd('df', 'disk usage (mock)', () => this._print('/dev/vfs 1024M 512M 512M 50% /')));
+    this.addCommand(cmd('du', 'directory usage (mock)', () => this._print('4K\t./docs\\n8K\t./home/user')));
+    this.addCommand(cmd('free', 'memory info (mock)', () => this._print('Mem: 1024MB total, 512MB used, 512MB free')));
+    this.addCommand(cmd('uptime', 'system uptime (mock)', () => this._print('up 1 day, 4:20')));
+    
+    // --- Utilities ---
+    this.addCommand(cmd('echo', 'echo arguments', args => this._print(args.join(' '))));
+    this.addCommand(cmd('history', 'command history', () => this.commandHistory.forEach((h,i)=>this._print(`${String(i+1).padStart(3, ' ')}  ${h}`))));
+    this.addCommand(cmd('date', 'current date/time', () => this._print(new Date().toString())));
+    this.addCommand(cmd('clear', 'clear terminal screen', () => this.clear()));
+    this.addCommand(cmd('exit', 'exit terminal', () => this._print('Exiting terminal...')));
+    this.addCommand(cmd('ping', 'ping host (mock)', args => this._print(`PING ${args[0] || 'localhost'}: 32 bytes`)));
+    this.addCommand(cmd('curl', 'fetch URL (mock)', args => this._print(`curl: fetched ${args[0] || 'http://example.com'}`)));
+    this.addCommand(cmd('help', 'show help', () => {
+        this._print('Available commands:\\n');
+        const longest = Math.max(...Object.keys(this.commands).map(n => n.length));
+        Object.values(this.commands)
+          .sort((a,b) => a.name.localeCompare(b.name))
+          .forEach(c => this._print(`${c.name.padEnd(longest)} - ${c.desc}`));
+    }));
+
+    // --- Fun / Visual (Async) ---
+    this.addCommand(cmd('aafire', 'ASCII fire animation', async () => {
+        this._print('Starting ASCII fire... Press Ctrl+C to stop.');
+        let running = true;
+        const stop = () => { running = false; };
+        this.ui.registerCtrlC(stop);
+        const frames = ["( ) ( )", "(   ) (   )", ") ( ) (", "(   ) (   )"];
+        while(running) {
+            for (const frame of frames) {
+                if (!running) break;
+                this._print(frame);
+                await new Promise(r => setTimeout(r, 200));
+            }
+        }
+        this._print('ASCII fire stopped.');
+        this.ui.registerCtrlC(null);
+    }));
+    this.addCommand(cmd('cmatrix', 'Matrix-style falling text', async () => {
+        this._print('Starting Matrix... Press Ctrl+C to stop.');
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789@#$%^&*';
+        let running = true;
+        const stop = () => { running = false; };
+        this.ui.registerCtrlC(stop);
+        while(running) {
+            const line = Array.from({length: 40}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+            this._print(`<span style="color: #0f0;">${line}</span>`);
+            await new Promise(r => setTimeout(r, 100));
+        }
+        this._print('Matrix stopped.');
+        this.ui.registerCtrlC(null);
+    }));
+  }
+
+
+  // Helper for the 'tree' command
+  _tree(dir, prefix) {
+    const entries = Object.values(dir.children).sort((a, b) => a.name.localeCompare(b.name));
+    entries.forEach((child, idx) => {
+      const last = idx === entries.length - 1;
+      const branch = last ? '└── ' : '├── ';
+      const nextPref = prefix + (last ? '    ' : '│   ');
+      this._print(prefix + branch + child.name + (child.kind === 'dir' ? '/' : ''));
+      if (child instanceof VDirectory) this._tree(child, nextPref);
+    });
+  }
+
+
+  // --- Autocomplete ---
+  _autoComplete() {
+    if (!this.ui || !this.ui.input) return;
+    // Implementation remains the same as your version...
+    const text = this.ui.input.value;
+    if (!text.trim()) return;
+    const parts = text.match(/(?:[^\\s\\"']+|'[^']*'|\\"[^\\"]*\\")+/g) || [];
+    const last = parts[parts.length - 1] || '';
+    const isPathy = last.startsWith('/') || last.startsWith('.') || last.startsWith('~');
+
+    if (parts.length === 1 && !isPathy) {
+      const all = Object.keys(this.commands);
+      const matches = all.filter(n => n.startsWith(last));
+      if (matches.length === 1) this.ui.input.value = matches[0] + ' ';
+      else if (matches.length > 1) this._print(matches.join('  '));
+      return;
+    }
+
+    const before = parts.slice(0, -1).join(' ');
+    const path = last;
+    let norm;
+    try { norm = this.vOS.normalize(path); } catch { norm = path; }
+    const dirPath = norm.endsWith('/') ? norm : (norm.lastIndexOf('/') >= 0 ? norm.slice(0, norm.lastIndexOf('/') + 1) : '/');
+    const base = norm.slice(dirPath.length);
+    const dir = this.vOS.resolve(dirPath || '.');
+    if (!(dir instanceof VDirectory)) return;
+    const ents = Object.keys(dir.children).filter(n => n.startsWith(base));
+    if (ents.length === 1) {
+      const comp = (dirPath === '/' && ents[0].startsWith('/') ? '' : dirPath) + ents[0];
+      const node = dir.children[ents[0]];
+      const suffix = node instanceof VDirectory ? '/' : ' ';
+      this.ui.input.value = (before ? before + ' ' : '') + comp + suffix;
+    } else if (ents.length > 1) this._print(ents.join('  '));
+  }
+}
+
+export { CentralTerminal, BootCheck, BootCheckRegistry, Addon, AddonExecutor, EditorAddon, RpsAddon, VFile, VDirectory, VOS, TerminalUI };

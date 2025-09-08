@@ -1,32 +1,38 @@
-# .github/workflows/nightly-release.yml
 name: Nightly Release
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs every day at midnight UTC
+    - cron: '0 3 1,15 * *' # Runs at 03:00 UTC on the 1st and 15th of every month
   workflow_dispatch: # Allows manual triggering
 
 jobs:
   publish-nightly:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write # for npm provenance
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '16'
+          registry-url: 'https://registry.npmjs.org/'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Get Current Date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y%m%d')"
 
-      - name: Create and publish nightly version
+      - name: Update Version
         run: |
-          npm version prerelease --preid nightly --no-git-tag-version
-          npm publish --tag nightly --provenance --access public
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          NEW_VERSION="$CURRENT_VERSION-nightly.${{ steps.date.outputs.date }}"
+          npm version $NEW_VERSION --no-git-tag-version
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Publish to npm
+        run: npm publish --tag nightly
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

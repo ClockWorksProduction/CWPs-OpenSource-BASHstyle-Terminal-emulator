@@ -1,59 +1,59 @@
-# .github/workflows/release.yml
 name: Stable Release
 
 on:
   workflow_dispatch:
     inputs:
-      version-bump:
+      version:
         type: choice
-        description: 'What type of version bump?'
+        description: 'What type of release is this?'
         required: true
-        default: 'patch'
         options:
-          - patch
-          - minor
-          - major
+        - patch
+        - minor
+        - major
 
 jobs:
-  publish-release:
+  release:
+    name: Create Stable Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # to allow version bump and tagging
-      id-token: write # for npm provenance
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          # We need to fetch all history and branches for versioning
+          # We need to fetch all history and tags for versioning
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for commit and tag access
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          node-version: '18' # Or your project's node version
+          registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Sync package-lock.json
-        run: |
-          git add package-lock.json
-          git diff --staged --quiet || git commit -m "chore: sync package-lock.json"
+      - name: Run tests
+        run: npm test
 
-      - name: Check git status
-        run: git status
-
-      - name: Bump version, push, and publish
+      - name: Configure Git
         run: |
-          npm version ${{ github.event.inputs.version-bump }} -m "chore(release): stable release %s"
-          git push origin ${{ github.ref_name }} --follow-tags
-          npm publish --tag latest --provenance --access public
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+      
+      - name: Bump version and create tag
+        run: |
+          npm version ${{ github.event.inputs.version }} -m "chore(release): %s"
+          git push
+          git push --tags
+
+      - name: Publish to npm
+        run: npm publish --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v$(jq -r .version package.json)
+          generateReleaseNotes: true

@@ -2,10 +2,6 @@
 
 The CWP Open Terminal Emulator includes a virtual file system (VFS) that simulates a real file system in the browser's memory. This allows you and your users to create, manage, and interact with files and directories within the terminal environment.
 
-## The `VOS` Class
-
-The virtual file system is managed by the `VOS` (Virtual Operating System) class. An instance of this class is automatically created when you initialize the `CentralTerminal` and is accessible within addons via the `this.vOS` property.
-
 ## Default File Structure
 
 When the terminal boots, it creates a default directory structure to provide a familiar starting environment:
@@ -20,9 +16,9 @@ When the terminal boots, it creates a default directory structure to provide a f
         └── README.txt
 ```
 
-## File and Directory Operations
+## Command-Line Interaction
 
-The VFS supports a standard set of operations for managing files and directories, which are exposed through the default terminal commands.
+The VFS supports a standard set of operations for managing files and directories, which are exposed through the default terminal commands:
 
 *   `ls`: List the contents of a directory.
 *   `cd`: Change the current working directory.
@@ -32,38 +28,71 @@ The VFS supports a standard set of operations for managing files and directories
 *   `rm`: Delete a file.
 *   `pwd`: Print the full path of the current working directory.
 
-## Interacting with the VFS Programmatically
+---
 
-When developing addons, you can directly interact with the VFS using the methods provided by the `VOS` class.
+## Programmatic API (`VOS`)
+
+When developing addons, you can directly interact with the VFS using the methods provided by the `VOS` (Virtual Operating System) class. An instance of this class is passed to your addon's `onStart` method.
+
+### Key Methods
+
+| Method                  | Description                                            |
+| ----------------------- | ------------------------------------------------------ |
+| `createFile(path, content)` | Creates a new file with optional content.              |
+| `readFile(path)`        | Reads the content of a file. Returns a string.       |
+| `updateFile(path, content)` | Overwrites the content of an existing file.          |
+| `deleteFile(path)`      | Deletes a file.                                        |
+| `createDirectory(path)` | Creates a new directory.                               |
+| `listDirectory(path)`   | Returns an array of file and directory names.        |
+| `getFullPath(path)`     | Resolves a relative path to a full, absolute path.   |
+| `pathExists(path)`      | Checks if a file or directory exists at the given path.|
+
+### Example Usage in an Addon
+
+The following example demonstrates how to use the `VOS` API to create, read, and manage files from within an addon.
 
 ```javascript
+import { Addon } from '/src/index.js';
+
 class FilesystemAddon extends Addon {
     constructor() {
         super('fs-demo');
     }
 
     onStart(term, vOS) {
-        this.term.print("Demonstrating file system access.");
+        this.term.print("Demonstrating file system access...");
 
-        // Get the current working directory
-        const cwd = this.vOS._getFullPath(this.vOS.cwd);
-        this.term.print(`Current directory: ${cwd}`);
+        // The vOS instance is received here
+        this.vOS = vOS;
 
-        // Create a new file
-        const filePath = `${cwd}/my-new-file.txt`;
-        const success = this.vOS.createFile(filePath, "Hello from the addon!");
+        // Get the full path to the user's home directory
+        const homeDir = this.vOS.getFullPath('~/_docs');
+        const filePath = `${homeDir}/demo-file.txt`;
 
-        if (success) {
-            this.term.print(`Created file: ${filePath}`);
+        // 1. Create a directory
+        if (!this.vOS.pathExists(homeDir)) {
+            this.vOS.createDirectory(homeDir);
+            this.term.print(`Created directory: ${homeDir}`)
+        }
+
+        // 2. Create a file
+        const content = "Hello from a CWP addon!";
+        if (this.vOS.createFile(filePath, content)) {
+            this.term.print(`Successfully created file: ${filePath}`);
         } else {
-            this.term.print("Failed to create file.");
+            this.term.print(`File already exists: ${filePath}`);
         }
 
-        // Read the file
-        const file = this.vOS._resolvePath(filePath);
-        if (file) {
-            this.term.print(`File content: ${file.content}`);
+        // 3. Read the file
+        const fileContent = this.vOS.readFile(filePath);
+        if (fileContent !== null) {
+            this.term.print(`Content of ${filePath}:`);
+            this.term.print(`> ${fileContent}`);
+        } else {
+            this.term.print(`Could not read file: ${filePath}`);
         }
+
+        this.exit();
     }
 }
 ```

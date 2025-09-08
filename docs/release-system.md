@@ -1,87 +1,40 @@
-# Release & Publishing Guide
+# Release & Publishing System
 
-This document outlines the automated release system for the CWP Open Terminal Emulator. The system uses GitHub Actions to manage versioning and publishing to the npm registry, providing clear and distinct release channels for different user needs.
+This project uses a four-tier automated release system powered by GitHub Actions. Each tier serves a different purpose and is published to npm under a specific dist-tag.
 
-## Overview of Release Channels
+## Release Channels
 
-Our project utilizes a four-tier release system:
-
-1.  **Dev Release (`@dev`)**: The most unstable, bleeding-edge version. A new version is published with every single commit to the `main` branch.
-2.  **Nightly Release (`@nightly`)**: A more stable pre-release version, published bi-weekly. This is ideal for developers who want to test upcoming features without being on the commit-by-commit bleeding edge.
-3.  **Stable Release (`@latest`)**: The official, production-ready version. This is the default release for most users.
-4.  **Long-Term Support (`@lts`)**: A specific major version line that only receives critical bug fixes, providing maximum stability for large or legacy projects.
-
-### Prerequisite: NPM Token
-
-All workflows require a secret token to authenticate with the npm registry. This must be configured in the repository settings:
-
-1.  Navigate to the repository's **Settings** > **Secrets and variables** > **Actions**.
-2.  Create a **New repository secret**.
-3.  Set the **Name** to `NPM_TOKEN`.
-4.  Paste in a valid **npm access token** with "Automation" or "Publish" permissions.
+| Channel | npm Tag | Source Branch | Trigger | Current Version |
+|---|---|---|---|---|
+| **Dev** | `@dev` | `main` | Every push | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg) |
+| **Nightly** | `@nightly`| `main` | Bi-weekly schedule | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg) |
+| **Stable** | `@latest` | `main` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg) |
+| **LTS** | `@lts` | `release/vX` | Manual dispatch | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
 
 ---
 
-## 1. Dev Release (`@dev`)
+## Workflow Details
 
-This workflow ensures that the absolute latest code from the `main` branch is always available for immediate testing.
+### 1. Dev (`@dev`)
+- **Workflow File:** `.github/workflows/dev-release.yml`
+- **Trigger:** On every push to the `main` branch.
+- **Action:** Builds the project and publishes to npm with the `@dev` tag.
+- **Versioning:** `(package.json version)-dev.(git-sha)` (e.g., `5.1.0-dev.a1b2c3d`).
 
-*   **Tag on npm**: `@dev`
-*   **Trigger**: Runs automatically on every `git push` to the `main` branch.
-*   **Workflow file**: `.github/workflows/dev-release.yml`
-*   **Versioning**: Generates a unique version by combining the latest version with the commit hash (e.g., `4.0.7-dev.a1b2c3d`).
+### 2. Nightly (`@nightly`)
+- **Workflow File:** `.github/workflows/nightly-release.yml`
+- **Trigger:** Runs on a schedule (e.g., every two weeks).
+- **Action:** Builds the project from the latest `main` branch and publishes with the `@nightly` tag.
+- **Versioning:** `(package.json version)-nightly.(yyyymmdd)` (e.g., `5.1.0-nightly.20250915`).
 
-### Installing the Dev Version
+### 3. Stable (`@latest`)
+- **Workflow File:** `.github/workflows/release.yml`
+- **Trigger:** Manually from the GitHub Actions tab.
+- **Action:** Prompts for a version bump (major, minor, patch), runs tests, creates a GitHub Release, and publishes to npm with the `@latest` tag.
+- **Versioning:** Standard SemVer (e.g., `5.1.0`).
 
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@dev
-```
-
----
-
-## 2. Nightly Release (`@nightly`)
-
-This workflow provides a regularly scheduled, more stable pre-release for testing.
-
-*   **Tag on npm**: `@nightly`
-*   **Trigger**: Runs on a schedule (bi-weekly at 03:00 UTC on the 1st and 15th of the month). It can also be triggered manually.
-*   **Workflow file**: `.github/workflows/nightly-release.yml`
-*   **Versioning**: Creates a pre-release version, like `4.1.0-nightly.0`.
-
-### Installing the Nightly Version
-
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@nightly
-```
-
----
-
-## 3. Stable Release (`@latest`)
-
-This workflow provides a controlled process for publishing official, stable releases.
-
-*   **Tag on npm**: `@latest`
-*   **Trigger**: Must be run manually from the repository's "Actions" tab against the `main` branch.
-*   **Workflow file**: `.github/workflows/release.yml`
-*   **Versioning**: Asks for a `patch`, `minor`, or `major` bump. It then automatically increments the version and creates a Git tag (e.g., `v4.1.0`).
-
----
-
-## 4. Long-Term Support (LTS) Release (`@lts`)
-
-The LTS channel is for providing critical bug fixes to a previous major version.
-
-*   **Tag on npm**: `@lts`
-*   **Trigger**: Must be run manually against a dedicated LTS branch (e.g., `release/v4`).
-*   **Workflow file**: `.github/workflows/lts-release.yml`
-*   **Versioning**: Automatically performs a `patch` bump on the current version of the LTS branch.
-
-### How to Manage and Publish an LTS Release
-
-For detailed instructions on setting up LTS branches and backporting fixes, please refer to the workflow comments in the `.github/workflows/lts-release.yml` file.
-
-### Installing the LTS Version
-
-```bash
-npm install @clockworksproduction-studio/cwp-open-terminal-emulator@lts
-```
+### 4. Long-Term Support (`@lts`)
+- **Workflow File:** `.github/workflows/lts-release.yml`
+- **Trigger:** Manually from the GitHub Actions tab, targeting a specific `release/vX` branch.
+- **Action:** Publishes critical bug fixes for a previous major version.
+- **Versioning:** Patch-only SemVer (e.g., `4.5.1`).

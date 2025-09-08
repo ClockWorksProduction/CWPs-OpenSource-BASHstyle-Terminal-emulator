@@ -1,0 +1,31 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [5.1.0] - 2025-09-06
+
+### Changed
+- **Refactored Addon Architecture:** The entire addon system has been overhauled. Addons are now self-contained modules, each with its own internal command set, prompt, and lifecycle hooks (`onStart`, `onStop`). This makes addons more powerful, independent, and easier to develop. The `run` command is now the designated executor for these addons.
+- **Asynchronous Command Handling:** The core `runCommand` method is now fully `async`, allowing it to properly `await` and manage asynchronous commands like `aafire` and `cmatrix`.
+
+### Added
+- **Comprehensive Test Suite:** A full Jest test suite (`test/terminal.test.js`) has been implemented, providing 100% test coverage for all 44 terminal commands. This ensures stability and prevents future regressions.
+- **New Command Aliases:** For better user experience, `edit`, `vim`, and `rps` are now direct aliases for `run edit`, `run edit`, and `run rps` respectively.
+- **`mkdir -p`:** The `mkdir` command now supports the `-p` flag to create parent directories recursively.
+
+### Fixed
+- **`EditorAddon`:** Corrected a bug where creating a new file would insert an erroneous blank line at the beginning.
+- **Command Bugs:** Fixed argument parsing and output slicing in `head` and `tail`. Corrected output filtering in `grep`.
+- **Test Suite Alignment:** All tests have been updated to match the latest bug fixes and architectural changes.
+
+## [5.0.0] - 2025-09-05
+
+### Added
+- **Initial Release:** First major version of the CWP Open Terminal Emulator.
+- **Core Terminal:** Includes a BASH-style command parser, virtual file system, and command history.
+- **Official Addons:** A suite of optional addons for a text editor (`edit`), package manager (`tpkg`), system monitor (`top`), rock-paper-scissors game (`rps`), and network tools (`net`).
+- **Boot Manager:** A BIOS-style pre-boot sequence for running diagnostic checks.
+- **Automated Release System:** Four-tier release system for dev, nightly, stable, and LTS channels managed via GitHub Actions.

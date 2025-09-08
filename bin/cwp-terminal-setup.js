@@ -23,15 +23,12 @@ const generateHTML = (containerId, jsFileName) => `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CWP Open Terminal Emulator</title>
   <style>
-    /* Basic styling for the terminal container */
     body, html {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
       background-color: #1a1a1a;
-      color: #f0f0f0;
-      font-family: monospace;
     }
     #${containerId} {
       width: 100%;
@@ -46,42 +43,32 @@ const generateHTML = (containerId, jsFileName) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-const generateJS = (containerId, prompt) => `
+const generateJS = (containerId) => ```
 import { CentralTerminal } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
 
-// 1. Define the ID of the container element from your HTML
-const terminalContainer = '#${containerId}';
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    // 1. Initialize the Terminal by passing in the ID of the container element
+    const term = new CentralTerminal('#${containerId}');
 
-// 2. Define your custom terminal options
-const terminalOptions = {
-    prompt: '${prompt}'
-};
+    // 2. Boot the terminal to make it visible and operational
+    term.boot();
 
-// 3. Initialize the Terminal
-try {
-  const term = new CentralTerminal(terminalContainer, terminalOptions);
-
-  // 4. Boot the terminal to make it visible and operational
-  term.boot();
-
-  console.log('Terminal has been successfully booted!');
-  term.print("Welcome! Type 'help' to see a list of available commands.");
-
-} catch (error) {
-  console.error("Failed to initialize terminal:", error);
-  const container = document.querySelector(terminalContainer);
-  if (container) {
-    container.innerHTML = \`
-      <div style="color: red; font-family: monospace; padding: 1em;">
-        <h2>Error Initializing Terminal</h2>
-        <p>Could not find the container element: <strong>'${containerId}'</strong></p>
-        <p>Please ensure your HTML file includes an element with this ID, for example:</p>
-        <pre>&lt;div id="${containerId}"&gt;&lt;/div&gt;</pre>
-      </div>
-    \`;
+  } catch (error) {
+    console.error("Failed to initialize terminal:", error);
+    const container = document.querySelector('#${containerId}');
+    if (container) {
+      container.innerHTML = ``
+        <div style="color: red; font-family: monospace; padding: 1em;">
+          <h2>Error Initializing Terminal</h2>
+          <p><strong>Error:</strong> ${error.message}</p>
+          <p>Please check the console for more details.</p>
+        </div>
+      ``;
+    }
   }
-}
-`;
+});
+```;
 
 async function main() {
   console.log(`
@@ -93,18 +80,17 @@ It will create files in the current directory: ${process.cwd()}
 `);
 
   const containerId = await askQuestion('HTML element ID for the terminal', 'central-terminal-container');
-  const prompt = await askQuestion('Desired terminal prompt', '[user@localhost ~]$ ');
-  const jsFileName = await askQuestion('Name for your JavaScript file', 'main.js');
+  const jsFileName = await askQuestion('Name for your JavaScript file', 'app.js');
   const createHtml = await askQuestion('Create a basic index.html file?', 'yes');
 
-  const jsContent = generateJS(containerId, prompt);
+  const jsContent = generateJS(containerId);
   const jsFilePath = path.join(process.cwd(), jsFileName);
 
   try {
     fs.writeFileSync(jsFilePath, jsContent.trim());
-    console.log(`\n(Success) Successfully created ${jsFileName}`);
+    console.log(`\\n(Success) Successfully created ${jsFileName}`);
   } catch (error) {
-    console.error(`\n(Error) Error creating ${jsFileName}:`, error);
+    console.error(`\\n(Error) Error creating ${jsFileName}:`, error);
     rl.close();
     return;
   }
@@ -116,7 +102,7 @@ It will create files in the current directory: ${process.cwd()}
       fs.writeFileSync(htmlFilePath, htmlContent);
       console.log(`(Success) Successfully created index.html`);
     } catch (error) {
-      console.error(`\n(Error) Error creating index.html:`, error);
+      console.error(`\\n(Error) Error creating index.html:`, error);
       rl.close();
       return;
     }
