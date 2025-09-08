@@ -1,50 +1,39 @@
-# .github/workflows/dev-release.yml
-name: Development Release
+name: Dev Release
 
 on:
   push:
     branches:
-      # This workflow runs on every push to the main branch.
-      # Change this if your primary branch has a different name (e.g., master).
       - main
 
 jobs:
-  publish-dev:
+  release-dev:
+    name: Create Dev Release
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write # for npm provenance
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Create and publish dev version
+      - name: Prepare dev version string
+        id: prep_version
         run: |
-          # Get the latest published version from npm (e.g., 4.0.7).
-          LATEST_VERSION=$(npm view . version)
+          BASE_VERSION=$(jq -r .version package.json)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          FULL_VERSION="${BASE_VERSION}-dev.${SHORT_SHA}"
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
 
-          # Get the short hash of the current commit (e.g., a1b2c3d).
-          COMMIT_HASH=$(echo $GITHUB_SHA | head -c 7)
+      - name: Update package.json for publishing
+        run: npm version ${{ steps.prep_version.outputs.version }} --no-git-tag-version
 
-          # Create the new dev version string (e.g., 4.0.7-dev.a1b2c3d).
-          DEV_VERSION="$LATEST_VERSION-dev.$COMMIT_HASH"
-          
-          # Update package.json with the new version.
-          # The --no-git-tag-version flag prevents it from creating a git tag.
-          echo "Bumping version to $DEV_VERSION"
-          npm version $DEV_VERSION --no-git-tag-version
-          
-          # Publish the package to npm with the 'dev' tag.
-          # This makes it installable via 'npm install your-package@dev'.
-          npm publish --tag dev
+      - name: Publish to npm under dev tag
+        run: npm publish --tag dev
         env:
-          # The action uses the NPM_TOKEN secret to authenticate with npm.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

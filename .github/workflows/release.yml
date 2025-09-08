@@ -2,15 +2,6 @@ name: Stable Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        type: choice
-        description: 'What type of release is this?'
-        required: true
-        options:
-        - patch
-        - minor
-        - major
 
 jobs:
   release:
@@ -20,13 +11,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          # We need to fetch all history and tags for versioning
+          # Fetch all history for release notes
           fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18' # Or your project's node version
+          node-version: '18'
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
@@ -35,16 +26,9 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Configure Git
-        run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-      
-      - name: Bump version and create tag
-        run: |
-          npm version ${{ github.event.inputs.version }} -m "chore(release): %s"
-          git push
-          git push --tags
+      - name: Get version
+        id: get_version
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
         run: npm publish --tag latest
@@ -55,5 +39,5 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: v$(jq -r .version package.json)
+          tag: v${{ steps.get_version.outputs.version }}
           generateReleaseNotes: true

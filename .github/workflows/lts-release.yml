@@ -2,7 +2,6 @@ name: LTS Release
 
 on:
   workflow_dispatch:
-    # No inputs needed, as LTS is always a patch
 
 jobs:
   release-lts:
@@ -11,14 +10,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          # We need to fetch all history and tags for versioning
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18' # Or your project's node version
+          node-version: '18'
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
@@ -27,27 +23,27 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Configure Git
+      - name: Prepare LTS version string
+        id: prep_version
         run: |
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          BASE_VERSION=$(jq -r .version package.json)
+          LTS_SUFFIX=$(date +%Y%m)
+          FULL_VERSION="${BASE_VERSION}-lts.${LTS_SUFFIX}"
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Bump version to next patch and create tag
-        run: |
-          # LTS releases are always patches
-          npm version patch -m "chore(lts): %s"
-          git push
-          git push --tags
+      - name: Update package.json for publishing
+        run: npm version ${{ steps.prep_version.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Publish to npm under LTS tag
         run: npm publish --tag lts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release for LTS
+      - name: Create GitHub Pre-release for LTS
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: v$(jq -r .version package.json)
-          generateReleaseNotes: true
-          body: "This is a Long-Term Support (LTS) release providing critical bug fixes."
+          tag: v${{ steps.prep_version.outputs.version }}
+          name: Release ${{ steps.prep_version.outputs.version }}
+          body: "This is a Long-Term Support (LTS) pre-release."
+          prerelease: true
