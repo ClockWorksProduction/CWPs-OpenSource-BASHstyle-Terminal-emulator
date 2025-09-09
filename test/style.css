@@ -1,5 +1,4 @@
-module.exports = function cssTemplate() {
-    return `body, html {
+body, html {
     margin: 0;
     padding: 0;
     width: 100vw;
@@ -7,7 +6,7 @@ module.exports = function cssTemplate() {
     overflow: hidden;
     background-color: #000;
     color: #0f0;
-    font-family: \"Courier New\", monospace;
+    font-family: "Courier New", monospace;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -154,5 +153,3 @@ module.exports = function cssTemplate() {
     flex: 1;
     caret-color: #0f0;
 }
-`;
-};

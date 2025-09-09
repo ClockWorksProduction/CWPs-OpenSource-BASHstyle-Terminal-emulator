@@ -1,107 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CWP Open Terminal Emulator</title>
-  <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      background-color: #000;
-      color: #0f0;
-      font-family: "Courier New", monospace;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    #pseudo-terminal {
-      width: 80%;
-      max-width: 1000px;
-      height: 80vh;
-      background-color: #000;
-      border: 2px solid #0f0;
-      box-shadow: 0 0 20px rgba(0,255,0,0.5);
-      display: flex;
-      flex-direction: column;
-      padding: 1rem;
-      position: relative;
-    }
-
-    #terminalOutput {
-      flex: 1;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      line-height: 1.3;
-      padding-right: 0.2rem;
-      scroll-behavior: smooth;
-    }
-
-    #terminalOutput::-webkit-scrollbar {
-      width: 8px;
-    }
-    #terminalOutput::-webkit-scrollbar-track {
-      background: #000;
-    }
-    #terminalOutput::-webkit-scrollbar-thumb {
-      background-color: #0f0;
-      border-radius: 4px;
-    }
-
-    #terminal-command {
-      display: flex;
-      align-items: center;
-      margin-top: 0.3rem;
-    }
-    #terminal-prompt {
-      margin-right: 0.5rem;
-    }
-    #terminal-command-input {
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #0f0;
-      font-family: inherit;
-      font-size: 1rem;
-      flex: 1;
-      caret-color: #0f0;
-    }
-    #terminal-command-input::after {
-      content: '|';
-      animation: blink 1s step-start infinite;
-    }
-
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
-
-    #pseudo-terminal::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-image: repeating-linear-gradient(
-        0deg,
-        rgba(0,255,0,0.05),
-        rgba(0,255,0,0.05) 1px,
-        transparent 1px,
-        transparent 2px
-      );
-      pointer-events: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CWP Open Terminal Emulator</title>
+    <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div id="pseudo-terminal">
-    <div id="terminalOutput"></div>
-    <div id="terminal-command">
-      <span id="terminal-prompt">&gt;</span>
-      <input type="text" id="terminal-command-input" autocomplete="off" />
+    <div id="pseudo-terminal" class="crt-container">
+        <div class="crt-overlay"></div>
+        <div class="crt-noise"></div>
+        <div id="terminalOutput"></div>
+        <div id="terminal-command">
+            <span id="terminal-prompt">$</span>
+            <input type="text" id="terminal-command-input" autocomplete="off" />
+        </div>
     </div>
-  </div>
-  <script src="app.js" type="module"></script>
+    
+    <script src="./app.js" type="module"></script>
 </body>
 </html>

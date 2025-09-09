@@ -1,21 +1,24 @@
 module.exports = function htmlTemplate() {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang=\"en\">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CWP Open Terminal Emulator</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>CWP Open Terminal Emulator</title>
+    <link rel=\"stylesheet\" href=\"style.css\">
 </head>
 <body>
-<div id="pseudo-terminal">
-  <div id="terminalOutput"></div>
-  <div id="terminal-command">
-    <span id="terminal-prompt">&gt;</span>
-    <input type="text" id="terminal-command-input" autocomplete="off" />
-  </div>
-</div>
-<script src="app.js" type="module"></script>
+    <div id=\"pseudo-terminal\" class=\"crt-container\">
+        <div class=\"crt-overlay\"></div>
+        <div class=\"crt-noise\"></div>
+        <div id=\"terminalOutput\"></div>
+        <div id=\"terminal-command\">
+            <span id=\"terminal-prompt\">$</span>
+            <input type=\"text\" id=\"terminal-command-input\" autocomplete=\"off\" />
+        </div>
+    </div>
+    
+    <script src=\"app.js\" type=\"module\"></script>
 </body>
 </html>`;
 };
