@@ -8,13 +8,13 @@ module.exports = function htmlTemplate() {
     <link rel=\"stylesheet\" href=\"style.css\">
 </head>
 <body>
-    <div id=\"pseudo-terminal\" class=\"crt-container\">
+    <div id=\"pseudo-terminal\">
         <div class=\"crt-overlay\"></div>
         <div class=\"crt-noise\"></div>
         <div id=\"terminalOutput\"></div>
         <div id=\"terminal-command\">
             <span id=\"terminal-prompt\">$</span>
-            <input type=\"text\" id=\"terminal-command-input\" autocomplete=\"off\" />
+            <input type=\"text\" id=\"terminal-command-input\" autocomplete=\"off\" autofocus />
         </div>
     </div>
     

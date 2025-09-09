@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-// Require templates (CJS)
+// Require templates
 const htmlTemplate = require(path.join(__dirname, './templates/html.cjs'));
 const cssTemplate = require(path.join(__dirname, './templates/css.cjs'));
 const jsTemplate = require(path.join(__dirname, './templates/js.cjs'));

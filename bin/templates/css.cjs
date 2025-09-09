@@ -1,34 +1,33 @@
 module.exports = function cssTemplate() {
-    return `body, html {
-    margin: 0;
-    padding: 0;
-    width: 100vw;
-    height: 100vh;
-    overflow: hidden;
+    return `/* === Common Styles === */
+
+/* Basic body styling for the terminal */
+body {
+    margin: 0; /* Remove default body margin */
     background-color: #000;
     color: #0f0;
-    font-family: \"Courier New\", monospace;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden; /* Prevent overall page scroll */
     text-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
 }
 
+/* Pseudo Terminal Container */
 #pseudo-terminal {
-    width: 80%;
-    max-width: 1000px;
-    height: 80vh;
-    border: 2px solid #0f0;
-    box-shadow: 0 0 20px rgba(0,255,0,0.5);
     display: flex;
     flex-direction: column;
-    padding: 1rem;
-    position: relative;
+    position: fixed; /* Position it relative to the viewport */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box; /* Include padding in width and height */
     background-color: #000;
     overflow: hidden;
     filter: brightness(1.2) contrast(1.1);
 }
 
+/* CRT Overlay Effects */
 .crt-overlay {
     position: absolute;
     top: 0;
@@ -60,21 +59,6 @@ module.exports = function cssTemplate() {
     opacity: 0.8;
 }
 
-.crt-overlay::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(
-        ellipse at center,
-        rgba(0, 0, 0, 0) 65%,
-        rgba(0, 0, 0, 0.4) 100%
-    );
-    opacity: 0.5;
-}
-
 .crt-overlay.flicker {
     animation: flicker 0.2s linear infinite;
     animation-direction: alternate;
@@ -86,6 +70,7 @@ module.exports = function cssTemplate() {
     100% { opacity: 0.9; }
 }
 
+/* CRT Noise Effect */
 .crt-noise {
     position: absolute;
     top: 0;
@@ -95,9 +80,9 @@ module.exports = function cssTemplate() {
     z-index: 25;
     pointer-events: none;
     opacity: 0.05;
-    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAXy8fzgAAAABJRU5ErkJggg==');
 }
 
+/* Jitter Effect */
 #pseudo-terminal.jitter {
     animation: jitter 0.1s infinite alternate;
 }
@@ -110,49 +95,66 @@ module.exports = function cssTemplate() {
     100% { transform: translate(0, 0); }
 }
 
+/* Terminal Content */
 #terminalOutput, #terminal-command {
     position: relative;
     z-index: 10;
 }
 
+
+/* Terminal Output Area */
 #terminalOutput {
     flex: 1;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    line-height: 1.3;
-    padding-right: 0.2rem;
+    overflow-y: auto; /* Enable vertical scrolling */
+    white-space: pre-wrap; /* Preserve whitespace and wrap text */
+    word-break: break-all; /* Break long words */
+    margin-bottom: 10px; /* Space between output and input */
+    padding-bottom: 10px;
+    background: transparent;
     scroll-behavior: smooth;
-    background: transparent;
 }
 
-#terminalOutput::-webkit-scrollbar {
-    width: 8px;
-}
-#terminalOutput::-webkit-scrollbar-track {
-    background: #000;
-}
-#terminalOutput::-webkit-scrollbar-thumb {
-    background-color: #0f0;
-    border-radius: 4px;
-}
-
+/* Terminal Input Container */
 #terminal-command {
-    display: flex;
-    align-items: center;
-    margin-top: 0.3rem;
+    display: flex; /* Arrange prompt and input horizontally */
+    align-items: center; /* Vertically align items */
+    flex-shrink: 0; /* Prevent input container from shrinking vertically */
 }
+
+/* Terminal Prompt Symbol */
 #terminal-prompt {
-    margin-right: 0.5rem;
+    margin-right: 5px; /* Space between prompt and input */
 }
+
+/* Terminal Command Input */
 #terminal-command-input {
-    background: transparent;
-    border: none;
-    outline: none;
-    color: #0f0;
-    font-family: inherit;
-    font-size: 1rem;
-    flex: 1;
-    caret-color: #0f0;
+    flex-grow: 1; /* Allow input to take up available horizontal space */
+    background-color: transparent; /* Transparent background */
+    color: #00ff00; /* Green text */
+    font-family: 'Courier New', Courier, monospace; /* Monospaced font */
+    border: none; /* No border */
+    outline: none; /* Remove outline on focus */
+    font-size: 1em; /* Standard font size for input */
+    padding: 0; /* Remove default padding */
+    caret-color: transparent;
+}
+
+/* Blinking block cursor for the input field */
+#terminal-command-input:focus {
+    background-color: #00ff00;
+    color: #000;
+    animation: blink-caret 1s step-end infinite;
+}
+
+@keyframes blink-caret {
+    from, to { 
+        background-color: #00ff00; 
+        color: #000;
+    }
+    50% { 
+        background-color: transparent; 
+        color: #00ff00;
+    }
 }
 `;
 };

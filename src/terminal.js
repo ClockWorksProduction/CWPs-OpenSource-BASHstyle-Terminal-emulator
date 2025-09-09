@@ -527,11 +527,11 @@ class TerminalUI {
   }
 // ---------- Central Terminal ----------
 class CentralTerminal {
-  constructor(containerOrUI) {
+  constructor(containerOrUI, ...args) {
     this.version = '5.1.0';
 
     if (typeof containerOrUI === 'string') {
-      this.ui = new TerminalUI(containerOrUI, this.runCommand.bind(this), this._autoComplete.bind(this));
+      this.ui = new TerminalUI(containerOrUI, this.runCommand.bind(this), this._autoComplete.bind(this), ...args);
     } else {
       this.ui = containerOrUI;
     }

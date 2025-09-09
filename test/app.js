@@ -95,10 +95,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error("Failed to initialize terminal:", err);
     const container = document.querySelector('#pseudo-terminal');
     if(container) {
-      container.innerHTML = `<div style=\"color:red;font-family:monospace;padding:1em;\">\
-        <h2>Error Initializing Terminal</h2>\
-        <p><strong>Error:</strong> ${err.message}</p>\
-        <p>Check console for details.</p>\
+      container.innerHTML = `<div style= \"color:red;font-family:monospace;padding:1em;\">
+        <h2>Error Initializing Terminal</h2>
+        <p><strong>Error:</strong> ${err.message}</p>
+        <p>Check console for details.</p>
       </div>`;
     }
   }
