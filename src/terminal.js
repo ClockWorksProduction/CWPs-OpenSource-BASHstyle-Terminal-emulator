@@ -200,24 +200,145 @@ class VOS {
   }
 }
 
+// ---------- Boot Handler (CORRECTED) ----------
+class BootHandler {
+  constructor(terminal) {
+      this.term = terminal;
+      this.bootupTextElement = document.getElementById('bootup-text');
+      this.loadingBar = document.getElementById('loading-bar');
+      this.screens = document.querySelectorAll('.screen');
+      this.glitchOverlay = document.getElementById('glitch-overlay');
+      this.typingSpeed = 10;
+      this.glitchDuration = 300;
+      this.bootupText = terminal.customBootupText || `
+      CWP Open Terminal BIOS v5.x.x
+      -----------------------------------
+      Initializing system...
+      `;      
+  }
+
+  run() {
+      return new Promise(resolve => {
+          this.startBootupAnimation().then(() => resolve());
+      });
+  }
+
+  showScreen(screenId) {
+      this.screens.forEach(screen => {
+          if (screen) screen.classList.remove('active');
+      });
+      const screenToShow = document.getElementById(screenId);
+      if (screenToShow) {
+          screenToShow.classList.add('active');
+      }
+  }
+
+  async startBootupAnimation() {
+      this.showScreen('bootup-screen');
+      if (!this.bootupTextElement) {
+          return this.runBootChecks();
+      }
+
+      await this.typeText(this.bootupText);
+      const bootSuccess = await this.runBootChecks();
+
+      if (bootSuccess) {
+          await this.typeText('\nSystem ready. Initializing user session...\n');
+          await this.startLoadingScreen();
+      } else {
+          await this.typeText('\n<span class="status-failed">A critical error occurred. System halted.</span>');
+          return Promise.reject("Boot failed");
+      }
+  }
+
+  typeText(text) {
+      return new Promise(resolve => {
+          if (!this.bootupTextElement) return resolve();
+          let i = 0;
+          const typingInterval = setInterval(() => {
+              if (i < text.length) {
+                  this.bootupTextElement.innerHTML += text.charAt(i);
+                  i++;
+              } else {
+                  clearInterval(typingInterval);
+                  setTimeout(resolve, 200); // Small pause after typing
+              }
+          }, this.typingSpeed);
+      });
+  }
+
+  runBootChecks() {
+    // The registry now receives the DOM element directly
+    // to manage the line-by-line display of checks.
+    return this.term.bootRegistry.run(this.bootupTextElement);
+  }
+  
+  startLoadingScreen() {
+      return new Promise(resolve => {
+          this.showScreen('loading-screen');
+          if (!this.loadingBar) return resolve();
+          
+          let width = 0;
+          const loadingInterval = setInterval(() => {
+              width += Math.random() * 4;
+              if (width >= 100) {
+                  width = 100;
+                  this.loadingBar.style.width = width + '%';
+                  clearInterval(loadingInterval);
+                  // FIXED: Added a 500ms pause here to ensure the full bar is visible
+                  setTimeout(() => {
+                      this.triggerGlitchTransition(resolve);
+                  }, 500);
+              } else {
+                  this.loadingBar.style.width = width + '%';
+              }
+          }, 50);
+      });
+  }
+
+  triggerGlitchTransition(callback) {
+      if (!this.glitchOverlay) return callback();
+      
+      this.glitchOverlay.style.opacity = '1';
+      setTimeout(() => {
+          this.showScreen('pseudo-terminal');
+          callback();
+          this.glitchOverlay.style.opacity = '0';
+      }, this.glitchDuration);
+  }
+}
+
 // ---------- Boot Checks ----------
 class BootCheck { constructor(name, fn, description = '') { this.name = name; this.fn = fn; this.description = description; } }
 class BootCheckRegistry {
   constructor() { this.checks = []; }
   add(check) { this.checks.push(check); }
-  async run(term) {
-    let ok = true;
-    for (const c of this.checks) {
-      term._biosWrite(`Running: ${c.name}... `);
+  async run(bootupElement) {
+    if (!bootupElement) return true; // Failsafe if the element doesn't exist.
+
+    let allOk = true;
+    for (const check of this.checks) {
+      // 1. Create a new div for the current check and add its name.
+      const lineElement = document.createElement('div');
+      lineElement.innerHTML = `- ${check.name}... `;
+      bootupElement.appendChild(lineElement);
+
+      let status = '';
       try {
-        const passed = await c.fn();
-        term._biosWriteLine(passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>');
-        if (!passed) ok = false;
-      } catch {
-        term._biosWriteLine('<span class="status-failed">FAILED</span>'); ok = false;
+        // 2. Await the actual check's async function to complete.
+        const passed = await check.fn();
+        status = passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>';
+        if (!passed) allOk = false;
+      } catch (e) {
+        console.error(`Boot check "${check.name}" failed with an error:`, e);
+        status = '<span class="status-failed">FAILED</span>';
+        allOk = false;
       }
+
+      // 3. Append the result to the same line element.
+      lineElement.innerHTML += status;
     }
-    return ok;
+    return allOk;
   }
 }
 
@@ -528,7 +649,7 @@ class TerminalUI {
 // ---------- Central Terminal ----------
 class CentralTerminal {
   constructor(containerOrUI, ...args) {
-    this.version = '5.1.0';
+    this.version = '5.1.5';
 
     if (typeof containerOrUI === 'string') {
       this.ui = new TerminalUI(containerOrUI, this.runCommand.bind(this), this._autoComplete.bind(this), ...args);
@@ -543,6 +664,7 @@ class CentralTerminal {
     // this.editor and this.rps are now obsolete and have been removed.
     this.addonExecutor = new AddonExecutor(this, this.vOS);
     this.bootRegistry = new BootCheckRegistry();
+    this.customBootupText = null;
     this._registerDefaultCommands();
   }
 
@@ -551,6 +673,9 @@ class CentralTerminal {
   _biosWrite(text) { this.ui.appendTerminalOutput(text, false); }
   _biosWriteLine(text) { this.ui.appendTerminalOutput(text, true); }
   clear() { this.ui.clearTerminal(); }
+  setBootupText(text) {
+    this.customBootupText = text;
+  }
 
   // --- Retro BASH-like prompt ---
   prompt() {
@@ -611,10 +736,9 @@ class CentralTerminal {
 
   // --- Boot Sequence ---
   async boot() {
-    this.clear();
-    this._biosWriteLine('CWP Open Terminal BIOS v5.1.0');
-    this._biosWriteLine('-----------------------------------');
+    const bootHandler = new BootHandler(this);
 
+    // Add default checks
     this.bootRegistry.add(new BootCheck('Loading saved session', () => {
       try {
         const vosData = localStorage.getItem('cterm_vos');
@@ -627,18 +751,31 @@ class CentralTerminal {
         return true; // Don't block boot on corrupted save
       }
     }));
+    
+    this.bootRegistry.add(new BootCheck('Verifying core components', async () => {
+        await new Promise(r => setTimeout(r, 150)); // fake delay
+        return typeof this.vOS !== 'undefined' && typeof this.addonExecutor !== 'undefined';
+    }));
 
-    const bootSuccess = await this.bootRegistry.run(this);
+    this.bootRegistry.add(new BootCheck('Checking UI elements', async () => {
+        await new Promise(r => setTimeout(r, 200)); // fake delay
+        return this.ui && this.ui.input && this.ui.output;
+    }));
 
-    if (bootSuccess) {
-      this._biosWriteLine('\\nSystem ready. Launching terminal...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      this.clear();
-      const motd = this.vOS.readFile('/etc/motd');
-      if (motd) this._print(motd);
-      this.ui.setPrompt(this.prompt()); // Set initial prompt
-    } else {
-      this._biosWriteLine('\\n<span class="status-failed">A critical error occurred. System halted.</span>');
+    try {
+        // Run the full animated boot sequence
+        await bootHandler.run();
+        
+        // This code runs *after* the animation is complete
+        this.clear(); // Clear bootup text from the actual terminal output
+        const motd = this.vOS.readFile('/etc/motd');
+        if (motd) this._print(motd);
+        this.ui.setPrompt(this.prompt()); // Set initial prompt
+        this.ui.input.focus();
+
+    } catch (error) {
+        console.error(error); // Log boot failure
+        // The error message is already on the boot screen
     }
   }
 

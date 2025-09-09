@@ -1,7 +1,89 @@
 module.exports = `
 /*
 ========================================
-  Terminal Base & Layout
+  Screen Management (for Boot Sequence)
+========================================
+*/
+
+/* Hides all screens by default */
+.screen {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    color: #0f0;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Shows the currently active screen */
+.screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Bootup screen styling */
+#bootup-screen {
+    padding: 2em;
+    font-size: 1.2em;
+    box-sizing: border-box;
+    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+#bootup-text {
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+#bootup-text > div {
+    margin-bottom: 0.5em;
+}
+
+.status-ok { color: #2f2; }
+.status-failed { color: #f22; font-weight: bold; }
+
+/* Loading screen styling */
+#loading-screen {
+    justify-content: center;
+    align-items: center;
+}
+
+#loading-text {
+    font-size: 3em;
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 5px #0f0;
+}
+
+.loading-bar-container {
+    width: 60%;
+    height: 20px;
+    border: 2px solid #0f0;
+    margin-top: 1em;
+}
+
+#loading-bar {
+    width: 0%;
+    height: 100%;
+    background-color: #0f0;
+    box-shadow: 0 0 10px #0f0;
+    transition: width 0.1s ease-out;
+}
+
+/* Glitch overlay for transitions */
+#glitch-overlay {
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s linear;
+}
+
+
+/*
+========================================
+  Terminal Base & Layout (Your Original)
 ========================================
 */
 
@@ -12,12 +94,12 @@ body {
     color: #0f0;
     font-family: 'Courier New', Courier, monospace;
     overflow: hidden;
-    text-shadow: 0 0 5px rgba(0, 255, 0, 0.4); /* General text glow */
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.4);
 }
 
 /* Main terminal container */
 #pseudo-terminal {
-    display: flex;
+    /* REMOVED: \`display: none;\` This was the cause of the blank screen */
     flex-direction: column;
     position: fixed;
     top: 0;
@@ -48,6 +130,11 @@ body {
     padding-bottom: 10px;
     background: transparent;
     scroll-behavior: smooth;
+}
+
+/* Reduced line-height for compact output */
+#terminalOutput > div {
+    line-height: 1.1;
 }
 
 /* Input line container */
@@ -87,7 +174,7 @@ body {
 
 /*
 ========================================
-  CRT Visual Effects
+  CRT Visual Effects (Your Original + Fixes)
 ========================================
 */
 
@@ -114,10 +201,17 @@ body {
         transparent 2px
     );
     box-shadow:
-        inset 0 0 15vmin 5vmin rgba(0,0,0,0.5),      /* Inner shadow for vignette */
-        inset 0 0 10vmin 5vmin rgba(255,255,255,0.05); /* Inner glow for curvature */
+        inset 0 0 15vmin 5vmin rgba(0,0,0,0.5),
+        inset 0 0 10vmin 5vmin rgba(255,255,255,0.05);
     opacity: 0.8;
+    animation: scanline-move 0.2s linear infinite;
 }
+
+@keyframes scanline-move {
+    from { background-position-y: 0; }
+    to { background-position-y: -2px; }
+}
+
 
 .crt-overlay::after {
     content: '';
@@ -144,7 +238,7 @@ body {
     mix-blend-mode: screen;
 }
 
-/* Horizontal green scanlines */
+/* Horizontal green scanlines (can be removed if ::before is preferred) */
 .crt-scanlines {
     position: absolute;
     top: 0;

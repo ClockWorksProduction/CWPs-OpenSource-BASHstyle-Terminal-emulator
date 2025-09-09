@@ -1,66 +1,56 @@
-module.exports = (options = {}) => {
-  const {
-    container = '#pseudo-terminal',
-    inputSelector = '#terminal-command-input',
-    outputSelector = '#terminalOutput',
-    promptSelector = '#terminal-prompt'
-  } = options;
+module.exports = function jsTemplate({ inputSelector, outputSelector, promptSelector }) {
+  return `import { CentralTerminal, EditorAddon, RpsAddon, BootCheck } from \'@clockworksproduction-studio/cwp-open-terminal-emulator\';
 
-  return `import { CentralTerminal, EditorAddon, RpsAddon } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
-
-document.addEventListener('DOMContentLoaded', async () => {
-  const crtContainer = document.querySelector('.crt-container');
-  const crtOverlay = document.querySelector('.crt-overlay');
-
-  function applyJitter() {
-    const jitterClass = 'jitter';
-    let isJittering = false;
-    setInterval(() => {
-      if (Math.random() > 0.95 && !isJittering) {
-        crtContainer.classList.add(jitterClass);
-        isJittering = true;
-        setTimeout(() => {
-          crtContainer.classList.remove(jitterClass);
-          isJittering = false;
-        }, 50 + Math.random() * 150);
-      }
-    }, 100);
-  }
-
-  function applyFlicker() {
-    const flickerClass = 'flicker';
-    setInterval(() => {
-      if (Math.random() > 0.8) {
-        crtOverlay.classList.toggle(flickerClass);
-        setTimeout(() => {
-          crtOverlay.classList.remove(flickerClass);
-        }, 50);
-      }
-    }, 100);
-  }
-
-  // Initialize CRT effects
-  applyJitter();
-  applyFlicker();
-
-  // --- Terminal boot ---
+document.addEventListener(\'DOMContentLoaded\', async () => {
+  const rootElement = \'#cwp-terminal-emulator-root\';
+  
   try {
-    const term = new CentralTerminal('${container}', {
-      inputSelector: '${inputSelector}',
-      outputSelector: '${outputSelector}',
-      promptSelector: '${promptSelector}'
+    const term = new CentralTerminal(rootElement, {
+      inputSelector: \'${inputSelector}\',
+      outputSelector: \'${outputSelector}\',
+      promptSelector: \'${promptSelector}\'
     });
 
+    // --- Register Addons ---
+    // You can create your own addons by extending the Addon class.
+    // See the documentation for more details.
     term.registerAddon(new EditorAddon());
     term.registerAddon(new RpsAddon());
+
+    // --- Customize Boot Sequence (Optional) ---
+    // You can add your own asynchronous checks to the boot sequence.
+    /*
+    const myCheck = new BootCheck(\'Checking for updates\', async () => {
+      await new Promise(r => setTimeout(r, 500));
+      return true; // Return false to indicate a failure
+    });
+    term.bootRegistry.add(myCheck);
+    */
+
+    // You can also customize the bootup text entirely.
+    /*
+    term.setBootupText(\`
+    MY CUSTOM BIOS v1.0
+    -------------------
+    Initializing...
+    \`);
+    */
+
+    // --- Boot the Terminal ---
+    // The boot() method runs the full animation and all registered checks.
     await term.boot();
 
-    term._print("Welcome to the Central Terminal! Have a great day!\\n");
-    term._print("CWP Open Terminal Emulator v5.2.5");
-    term._print("(c) 2025 ClockWorks Production Studio");
+    // --- Post-Boot Welcome Message ---
+    // The default /etc/motd is printed automatically after boot.
+    // You can add your own custom messages here.
     term._print("Type 'help' to see available commands.\\n");
+
   } catch (err) {
-    console.error("Failed to initialize terminal:", err);
+    console.error("Fatal: Failed to initialize terminal:", err);
+    const root = document.querySelector(rootElement);
+    if(root) {
+      root.innerHTML = \'<div style="color: #ff4d4d; font-family: monospace; padding: 1em;"><strong>FATAL ERROR</strong><br>Could not initialize terminal.<br>See browser console (F12) for technical details.</div>\';
+    }
   }
 });
 `;
