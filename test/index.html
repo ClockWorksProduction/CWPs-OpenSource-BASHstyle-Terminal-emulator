@@ -7,17 +7,19 @@
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="crt-overlay">
-    <div class="crt-noise">
-      <div id="pseudo-terminal">
-        <div id="terminalOutput"></div>
-          <div id="terminal-command">
-            <span id="terminal-prompt">$</span>
-            <input type="text" id="terminal-command-input" autocomplete="off" autofocus />
-          </div>
-      </div>
+  <div id="pseudo-terminal" class="crt-container">
+    <div id="terminalOutput"></div>
+    <div id="terminal-command">
+      <span id="terminal-prompt"></span>
+      <input id="terminal-command-input" type="text" />
     </div>
+
+    <!-- CRT layers -->
+    <div class="crt-overlay"></div>
+    <div class="crt-green-scanlines"></div>
+    <div class="crt-sweep"></div>
   </div>
-  <script src="./app.js" type="module"></script>
+
+  <script src="./app.js"></script>
 </body>
 </html>

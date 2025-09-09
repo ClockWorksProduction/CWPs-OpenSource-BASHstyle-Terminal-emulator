@@ -551,12 +551,16 @@ class CentralTerminal {
   _biosWrite(text) { this.ui.appendTerminalOutput(text, false); }
   _biosWriteLine(text) { this.ui.appendTerminalOutput(text, true); }
   clear() { this.ui.clearTerminal(); }
+
+  // --- Retro BASH-like prompt ---
   prompt() {
     if (this.addonExecutor.isActive()) {
-        return `(${this.addonExecutor.activeAddon.name})> `;
+      return `(${this.addonExecutor.activeAddon.name})> `;
     }
-    return '$ ';
-}
+    const cwd = this.vOS.pathOf(this.vOS.cwd);
+    return `<span class="prompt-user">user</span>@<span class="prompt-host">central</span> <span class="prompt-path">${cwd}</span>$ `;
+  }
+
   _saveHistory() { localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
   _saveState() { localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
 
