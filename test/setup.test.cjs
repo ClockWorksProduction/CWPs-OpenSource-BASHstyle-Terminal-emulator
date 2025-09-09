@@ -1,109 +1,79 @@
 const fs = require('fs');
-const readline = require('readline');
-const { main } = require('../bin/cwp-terminal-setup.cjs');
+const path = require('path');
+const { createProject } = require('../bin/cwp-terminal-setup.cjs');
 
-// Mock FS and Readline
+// Mock the templates being used
+jest.mock('../bin/templates/js.cjs', () => jest.fn(() => 'mock_js_content'));
+jest.mock('../bin/templates/css.cjs', () => 'mock_css_content', { virtual: true });
+jest.mock('../bin/templates/html.cjs', () => 'mock_html_content', { virtual: true });
+
+// Mock the entire fs module
 jest.mock('fs');
-jest.mock('readline');
 
-describe('CWP Terminal Setup CLI', () => {
-  let rlInterfaceMock;
-
+describe('createProject', () => {
   beforeEach(() => {
+    // Clear all mocks before each test to ensure a clean slate
     jest.clearAllMocks();
-
-    // Mock readline interface
-    rlInterfaceMock = {
-      question: jest.fn(),
-      close: jest.fn(),
-    };
-    readline.createInterface.mockReturnValue(rlInterfaceMock);
-
-    // Mock fs functions
-    fs.mkdirSync.mockImplementation(() => {});
-    fs.writeFileSync.mockImplementation(() => {});
-    fs.readFileSync.mockImplementation((filePath) => {
-      if (filePath.endsWith('index.html')) return '<html><body></body></html>';
-      return '';
-    });
-    fs.existsSync.mockImplementation((filePath) => false); // ensure mkdirSync runs
+    // Spy on console.error and mock its implementation to prevent logging during tests
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    // Restore original implementations after each test
     jest.restoreAllMocks();
   });
 
-  test('should generate full project with --new', async () => {
-    await main(['--new', '--dir', 'test-dir']);
+  test('should create all project files and directories correctly', () => {
+    // Arrange: Mock that the project directory does not exist to allow creation
+    fs.existsSync.mockReturnValue(false);
+    const projectName = 'my-new-terminal';
+    const projectPath = path.join(process.cwd(), projectName);
 
-    expect(fs.mkdirSync).toHaveBeenCalled();
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('test-dir/index.html'),
-      expect.any(String),
-      'utf8'
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('test-dir/style.css'),
-      expect.any(String),
-      'utf8'
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('test-dir/app.js'),
-      expect.any(String),
-      'utf8'
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('test-dir/TODO.md'),
-      expect.any(String),
-      'utf8'
-    );
-  });
+    // Act: Run the function to be tested
+    createProject(projectName);
 
-  test('should generate manual JS with --manual', async () => {
-    await main(['--manual', '--dir', 'manual-dir']);
+    // Assert: Verify that the expected filesystem operations were performed
+    expect(fs.mkdirSync).toHaveBeenCalledWith(projectPath, { recursive: true });
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('manual-dir/app.js'),
-      expect.any(String),
-      'utf8'
-    );
-  });
-
-  test('should refactor JS and inject div', async () => {
-    rlInterfaceMock.question.mockImplementation((q, cb) => cb('test'));
-
-    fs.existsSync.mockImplementation(() => true); // directory exists
-    fs.readFileSync.mockImplementation((filePath) =>
-      filePath.endsWith('index.html') ? '<html><body></body></html>' : ''
-    );
-
-    await main(['--refactor', '--dir', 'test']);
-
-    // Ensure index.html read and written
-    expect(fs.readFileSync).toHaveBeenCalledWith(
-      expect.stringMatching(/index\.html$/),
-      'utf8'
-    );
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringMatching(/index\.html$/),
-      expect.stringContaining('<div id="pseudo-terminal">'),
-      'utf8'
-    );
-
-    // Ensure JS overwritten
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      expect.stringMatching(/app\.js$/),
-      expect.any(String),
-      'utf8'
-    );
-  });
-
-  test('should call process.exit when multiple flags provided', async () => {
-    // Make process.exit throw to avoid hanging test
-    jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
+    const jsTemplate = require('../bin/templates/js.cjs');
+    expect(jsTemplate).toHaveBeenCalledWith({
+      outputSelector: '#terminalOutput',
+      promptSelector: '#terminal-prompt',
+      inputSelector: '#terminal-command-input'
     });
 
-    await expect(main(['--new', '--manual'])).rejects.toThrow('process.exit called');
-  }, 10000); // extend timeout just in case
+    expect(fs.writeFileSync).toHaveBeenCalledWith(path.join(projectPath, 'app.js'), 'mock_js_content');
+    expect(fs.writeFileSync).toHaveBeenCalledWith(path.join(projectPath, 'style.css'), 'mock_css_content');
+    expect(fs.writeFileSync).toHaveBeenCalledWith(path.join(projectPath, 'index.html'), 'mock_html_content');
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+        path.join(projectPath, 'TODO.md'),
+        expect.stringContaining('# Todo List')
+    );
+    expect(fs.writeFileSync).toHaveBeenCalledTimes(4);
+  });
+
+  test('should log an error if the project directory already exists', () => {
+    // Arrange: Mock that the directory already exists
+    fs.existsSync.mockReturnValue(true);
+    const projectName = 'existing-project';
+
+    // Act: Run the function
+    createProject(projectName);
+
+    // Assert: Check that an error was logged and no files were written
+    expect(console.error).toHaveBeenCalledWith(`Error: Directory '${projectName}' already exists.`);
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  test('should log an error if no project name is provided', () => {
+    // Act: Call the function without a project name
+    createProject(undefined);
+
+    // Assert: Check that an error was logged and no action was taken
+    expect(console.error).toHaveBeenCalledWith('Error: Project name is required.');
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
 });

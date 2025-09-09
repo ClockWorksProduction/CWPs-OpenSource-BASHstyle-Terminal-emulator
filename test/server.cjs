@@ -20,6 +20,10 @@ http.createServer((req, res) => {
     else if (normalizedUrl === '/app.js') {
         resourcePath = path.join(__dirname, 'app.js');
     }
+    // Special handling for style.css relative to the test directory
+    else if (normalizedUrl === '/style.css') {
+        resourcePath = path.join(__dirname, 'style.css');
+    }
     // For any other request, resolve it from the project root
     else {
         // Construct the path from the project root.

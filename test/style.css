@@ -43,11 +43,10 @@ body {
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
-    margin: 0 auto 10px auto;
+    margin: 0 0 10px 0;
     padding-bottom: 10px;
     background: transparent;
     scroll-behavior: smooth;
-    max-width: 80ch; /* Retro 80-column width */
 }
 
 /* Input line container */

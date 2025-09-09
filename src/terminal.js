@@ -558,7 +558,7 @@ class CentralTerminal {
       return `(${this.addonExecutor.activeAddon.name})> `;
     }
     const cwd = this.vOS.pathOf(this.vOS.cwd);
-    return `<span class="prompt-user">user</span>@<span class="prompt-host">central</span> <span class="prompt-path">${cwd}</span>$ `;
+    return `<span class="prompt-user">user</span>@<span class="prompt-host">central</span> <span class="prompt-path">${cwd}</span>: $ `;
   }
 
   _saveHistory() { localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
@@ -786,7 +786,7 @@ class CentralTerminal {
     this.addCommand(cmd('ping', 'ping host (mock)', args => this._print(`PING ${args[0] || 'localhost'}: 32 bytes`)));
     this.addCommand(cmd('curl', 'fetch URL (mock)', args => this._print(`curl: fetched ${args[0] || 'http://example.com'}`)));
     this.addCommand(cmd('help', 'show help', () => {
-        this._print('Available commands:\\n');
+        this._print('Available commands:\n');
         const longest = Math.max(...Object.keys(this.commands).map(n => n.length));
         Object.values(this.commands)
           .sort((a,b) => a.name.localeCompare(b.name))
