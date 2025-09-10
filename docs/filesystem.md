@@ -229,6 +229,17 @@ term.vOS.writeFile(
   'link'
 );
 
+// OR the method below
+// Correct way to load the VFS from JSON
+try {
+  const response = await fetch('./vfs.json');
+  const vfsData = await response.json();
+  // Assign a NEW VOS instance created from the JSON to the terminal
+  term.vOS = VOS.fromJSON(vfsData);
+} catch (error) {
+  console.error('Failed to load Virtual File System:', error);
+}
+
 // Now boot the terminal
 term.boot();
 ```
