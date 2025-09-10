@@ -12,6 +12,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     term.registerAddon(new EditorAddon());
     term.registerAddon(new RpsAddon());
 
+    // --- register coustom dir ---
+    try {
+      const response = await fetch('./test/vfs.json'); // Corrected Path
+      const vfsData = await response.json();
+      // Assign a NEW VOS instance created from the JSON to the terminal
+      term.vOS = VOS.fromJSON(vfsData);
+    } catch (error) {
+      console.error('Failed to load Virtual File System:', error);
+    }
+
     // --- (TEST) Set Custom Boot Text ---
     // This demonstrates how to override the default BIOS screen.
     const customBootText = `
