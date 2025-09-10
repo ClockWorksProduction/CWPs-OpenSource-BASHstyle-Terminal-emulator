@@ -31,8 +31,8 @@ class VOS {
   constructor() {
     this.root = new VDirectory('');
     this.homePath = '/home/user';
-    this.cwd = this.root;
-    this._seed();
+    this._seed(); // Seed first
+    this.cwd = this.resolve(this.homePath) || this.root; // FIX: Set cwd AFTER seeding.
   }
 
   // Serialization
@@ -68,7 +68,9 @@ class VOS {
 
   // Helpers
   _seed() {
-    this.mkdir('/home'); this.mkdir('/bin'); this.mkdir('/etc'); this.mkdir('/docs'); this.mkdir('/media');
+    this.mkdir('/home');
+    this.mkdir('/home/user'); // FIX: create user's home directory
+    this.mkdir('/bin'); this.mkdir('/etc'); this.mkdir('/docs'); this.mkdir('/media');
     this.mkdir('/media/images'); this.mkdir('/media/audio');
     this.writeFile('/etc/motd', 'Welcome to the Central Terminal!\n\nHave a great day!');
     const demo = `# Welcome to the Virtual File System!\n\nUse commands: ls, cd, cat, tree.\nEnjoy!\n`;
@@ -314,29 +316,32 @@ class BootCheckRegistry {
   constructor() { this.checks = []; }
   add(check) { this.checks.push(check); }
   async run(bootupElement) {
-    if (!bootupElement) return true; // Failsafe if the element doesn't exist.
-
     let allOk = true;
     for (const check of this.checks) {
-      // 1. Create a new div for the current check and add its name.
-      const lineElement = document.createElement('div');
-      lineElement.innerHTML = `- ${check.name}... `;
-      bootupElement.appendChild(lineElement);
+      let lineElement;
+      // Only perform DOM operations if the bootupElement exists
+      if (bootupElement) {
+        lineElement = document.createElement('div');
+        lineElement.innerHTML = `- ${check.name}... `;
+        bootupElement.appendChild(lineElement);
+      }
 
-      let status = '';
+      let statusText = '';
       try {
-        // 2. Await the actual check's async function to complete.
+        // Always run the check function
         const passed = await check.fn();
-        status = passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>';
         if (!passed) allOk = false;
+        statusText = passed ? '<span class="status-ok">OK</span>' : '<span class="status-failed">FAILED</span>';
       } catch (e) {
         console.error(`Boot check "${check.name}" failed with an error:`, e);
-        status = '<span class="status-failed">FAILED</span>';
+        statusText = '<span class="status-failed">FAILED</span>';
         allOk = false;
       }
 
-      // 3. Append the result to the same line element.
-      lineElement.innerHTML += status;
+      // Only update the DOM if it exists
+      if (bootupElement && lineElement) {
+        lineElement.innerHTML += statusText;
+      }
     }
     return allOk;
   }
@@ -354,7 +359,7 @@ class Addon {
     // Add default commands common to all addons
     this.addCommand('exit', 'Exit the current addon', () => this.exit());
     this.addCommand('help', 'Show help for this addon', () => {
-        this.term._print(`Available commands within '${this.name}':\\n`);
+        this.term._print(`Available commands within '${this.name}':\n`);
         const longest = Math.max(...Object.keys(this.commands).map(n => n.length));
         Object.values(this.commands)
           .sort((a,b) => a.name.localeCompare(b.name))
@@ -695,27 +700,46 @@ class CentralTerminal {
 
   // --- Main Command Runner (REPLACE THIS METHOD) ---
   async runCommand(rawInput) {
-    if (!rawInput.trim()) return;
+    const input = rawInput.trim();
+    if (!input) {
+        this.ui.setPrompt(this.prompt());
+        return;
+    }
 
-    // Split input respecting quotes
-    const parts = rawInput.match(/(?:[^\s"]+|"[^"]*")+/g).map(p => p.replace(/^"|"$/g, ''));
-    const name = parts.shift();
-    const args = parts;
+    // Echo the command to the terminal output
+    this.ui.appendTerminalOutput(`${this.prompt()}${input}`);
+
+    // If an addon is active, pass the command to it and stop further processing.
+    if (this.addonExecutor.handleCommand(input)) {
+        this._saveState(); // Save state after addon command
+        this.ui.setPrompt(this.prompt());
+        return;
+    }
+
+    // Add to history for main terminal commands
+    this.commandHistory.push(input);
+    this._saveHistory();
+
+    const parts = input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    const name = parts.shift() || '';
+    const args = parts.map(p => p.replace(/^["']|["']$/g, ''));
     const cmd = this.commands[name];
 
     if (!cmd) {
       this._print(`bash: ${name}: command not found`);
+      this.ui.setPrompt(this.prompt());
       return;
     }
 
     try {
-      // Support async commands too
       await cmd.execute(args, this);
     } catch (err) {
       this._print(`Error running command: ${err}`);
+      console.error(err);
     }
 
     this._saveState();
+    this.ui.setPrompt(this.prompt());
   }
 
   // --- Boot Sequence ---
@@ -775,7 +799,6 @@ class CentralTerminal {
             return;
         }
         term.addonExecutor.start(addonName, args);
-        term.ui.setPrompt(term.prompt());
     }));
     this.addCommand(cmd('edit', 'edit a file using the text editor addon', (args, term) => {
       term.addonExecutor.start('edit', args);
@@ -789,26 +812,19 @@ class CentralTerminal {
   
 
     // --- Filesystem (with fixes) ---
-    this.addCommand(cmd('ls', 'list files', args => {
-      const files = this.vOS.ls(args[0] || '.');
-      if (files === null) this._print(`ls: cannot access '${args[0] || '.'}'`);
-      else if (files.length > 0) this._print(files.join('  '));
-      else this._print('');
+    this.addCommand(cmd('ls', 'list files', (args, term) => {
+      const files = term.vOS.ls(args[0] || '.');
+      if (files === null) term._print(`ls: cannot access '${args[0] || '.'}'`);
+      else if (files.length > 0) term._print(files.join('  '));
     }));
-    this.addCommand({
-      name: 'cd',
-      description: 'Change directory',
-      execute: (args, term) => {
-        const target = args[0] || '/';
-        // Simple validation; extend with VFS later
-        term.cwd = target.startsWith('/') ? target : `${term.cwd}/${target}`;
-        // normalize double slashes
-        term.cwd = term.cwd.replace(/\/+/g, '/');
-      }
-    });  
+    this.addCommand(cmd('cd', 'change directory', (args, term) => {
+        const target = args[0] || '~';
+        if (!term.vOS.chdir(target)) {
+            term._print(`cd: no such file or directory: ${target}`);
+        }
+    }));
     this.addCommand(cmd('pwd', 'print working directory', () => this._print(this.vOS.pathOf(this.vOS.cwd))));
     
-    // UPDATED MKDIR: Now supports -p flag for the 'tree' test
     this.addCommand(cmd('mkdir', 'make directory', args => {
       const pathArg = args.filter(a => !a.startsWith('-')).pop();
       const pFlag = args.includes('-p');
@@ -838,8 +854,12 @@ class CentralTerminal {
       if (!src || !dest) { this._print('usage: mv <src> <dest>'); return; }
       const node = this.vOS.resolve(src);
       if (!node) { this._print(`mv: cannot stat '${src}'`); return; }
-      if (!this.vOS.writeFile(dest, node.content || '', node.ftype, true)) { this._print(`mv: cannot move to '${dest}'`); return; }
-      this.vOS.unlink(src);
+      const success = this.vOS.writeFile(dest, node.content || '', node.ftype, true);
+      if (success && node.kind === 'file') {
+          this.vOS.unlink(src);
+      } else if (!success) {
+          this._print(`mv: cannot move to '${dest}'`);
+      }
     }));
     this.addCommand(cmd('touch', 'create empty file', args => {
       if (!args[0]) this._print('usage: touch <file>');
@@ -850,7 +870,6 @@ class CentralTerminal {
       this._print(content === null ? `cat: ${args[0]}: No such file` : content);
     }));
 
-    // UPDATED HEAD: Correctly parses arguments and slices content
     this.addCommand(cmd('head', 'first N lines of a file', args => {
         const f = args[0]; const n = parseInt(args[1] || '10', 10);
         if (!f) { this._print('usage: head <file> [lines]'); return; }
@@ -859,7 +878,6 @@ class CentralTerminal {
         this._print(node.content.split('\n').slice(0, n).join('\n'));
     }));
 
-    // UPDATED TAIL: Correctly parses arguments and slices content
     this.addCommand(cmd('tail', 'last N lines of a file', args => {
         const f = args[0]; const n = parseInt(args[1] || '10', 10);
         if (!f) { this._print('usage: tail <file> [lines]'); return; }
@@ -875,13 +893,16 @@ class CentralTerminal {
       this._tree(dir, '');
     }));
     
-    // UPDATED GREP: Properly prints matching lines
     this.addCommand(cmd('grep', 'search pattern in file', args => {
       const [p, f] = args; if (!p || !f) { this._print('usage: grep <pattern> <file>'); return; }
       const node = this.vOS.resolve(f); if (!node || !(node instanceof VFile)) { this._print(`grep: ${f}: No such file`); return; }
-      const re = new RegExp(p, 'g');
-      const matches = node.content.split('\n').filter(l => re.test(l));
-      if (matches.length > 0) this._print(matches.join('\n'));
+      try {
+        const re = new RegExp(p, 'g');
+        const matches = node.content.split('\n').filter(l => l.match(re));
+        if (matches.length > 0) this._print(matches.join('\n'));
+      } catch (e) {
+        this._print(`grep: invalid pattern: ${e.message}`);
+      }
     }));
 
     // --- Mock FS Commands ---
@@ -893,7 +914,7 @@ class CentralTerminal {
     this.addCommand(cmd('umask', 'show umask', () => this._print('022')));
 
     // --- Process / System (Mocks) ---
-    this.addCommand(cmd('ps', 'list processes (mock)', () => this._print('PID TTY TIME CMD\\n1 pts/0 00:00 bash')));
+    this.addCommand(cmd('ps', 'list processes (mock)', () => this._print('PID TTY TIME CMD\n1 pts/0 00:00 bash')));
     this.addCommand(cmd('top', 'process monitor (mock)', () => this._print('Top: simulated')));
     this.addCommand(cmd('kill', 'kill process (mock)', () => this._print('kill: simulated')));
     this.addCommand(cmd('pkill', 'kill by name (mock)', () => this._print('pkill: simulated')));
@@ -903,13 +924,18 @@ class CentralTerminal {
     this.addCommand(cmd('uname', 'system information', () => this._print(`CentralTerminal OS v${this.version}`)));
     this.addCommand(cmd('whoami', 'current user', () => this._print('user')));
     this.addCommand(cmd('df', 'disk usage (mock)', () => this._print('/dev/vfs 1024M 512M 512M 50% /')));
-    this.addCommand(cmd('du', 'directory usage (mock)', () => this._print('4K\t./docs\\n8K\t./home/user')));
+    this.addCommand(cmd('du', 'directory usage (mock)', () => this._print('4K\t./docs\n8K\t./home/user')));
     this.addCommand(cmd('free', 'memory info (mock)', () => this._print('Mem: 1024MB total, 512MB used, 512MB free')));
     this.addCommand(cmd('uptime', 'system uptime (mock)', () => this._print('up 1 day, 4:20')));
     
     // --- Utilities ---
     this.addCommand(cmd('echo', 'echo arguments', args => this._print(args.join(' '))));
     this.addCommand(cmd('history', 'command history', () => this.commandHistory.forEach((h,i)=>this._print(`${String(i+1).padStart(3, ' ')}  ${h}`))));
+    this.addCommand(cmd('hclear', 'clear command history', (args, term) => {
+        term.commandHistory = [];
+        term._saveHistory();
+        term._print('Command history cleared.');
+    }));
     this.addCommand(cmd('date', 'current date/time', () => this._print(new Date().toString())));
     this.addCommand(cmd('clear', 'clear terminal screen', () => this.clear()));
     this.addCommand(cmd('exit', 'exit terminal', () => this._print('Exiting terminal...')));
@@ -924,38 +950,41 @@ class CentralTerminal {
     }));
 
     // --- Fun / Visual (Async) ---
-    this.addCommand(cmd('aafire', 'ASCII fire animation', async () => {
-        this._print('Starting ASCII fire... Press Ctrl+C to stop.');
+    this.addCommand(cmd('aafire', 'ASCII fire animation', async (args, term) => {
+        term._print('Starting ASCII fire... Press Ctrl+C to stop.');
         let running = true;
         const stop = () => { running = false; };
-        this.ui.registerCtrlC(stop);
+        term.ui.registerCtrlC(stop);
         const frames = ["( ) ( )", "(   ) (   )", ") ( ) (", "(   ) (   )"];
         while(running) {
             for (const frame of frames) {
                 if (!running) break;
-                this._print(frame);
+                // We create a new div for each frame to avoid clearing the screen
+                const frameDiv = document.createElement('div');
+                frameDiv.textContent = frame;
+                term.ui.output.appendChild(frameDiv);
+                term.ui.output.scrollTop = term.ui.output.scrollHeight;
                 await new Promise(r => setTimeout(r, 200));
             }
         }
-        this._print('ASCII fire stopped.');
-        this.ui.registerCtrlC(null);
+        term._print('ASCII fire stopped.');
+        term.ui.registerCtrlC(null); // Unregister the handler
     }));
-    this.addCommand(cmd('cmatrix', 'Matrix-style falling text', async () => {
-        this._print('Starting Matrix... Press Ctrl+C to stop.');
+    this.addCommand(cmd('cmatrix', 'Matrix-style falling text', async (args, term) => {
+        term._print('Starting Matrix... Press Ctrl+C to stop.');
         const chars = 'abcdefghijklmnopqrstuvwxyz0123456789@#$%^&*';
         let running = true;
         const stop = () => { running = false; };
-        this.ui.registerCtrlC(stop);
+        term.ui.registerCtrlC(stop); // Register handler
         while(running) {
-            const line = Array.from({length: 40}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
-            this._print(`<span style="color: #0f0;">${line}</span>`);
+            const line = Array.from({length: 80}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+            term._print(`<span style="color: #0f0;">${line}</span>`);
             await new Promise(r => setTimeout(r, 100));
         }
-        this._print('Matrix stopped.');
-        this.ui.registerCtrlC(null);
+        term._print('Matrix stopped.');
+        term.ui.registerCtrlC(null); // Unregister handler
     }));
   }
-
 
   // Helper for the 'tree' command
   _tree(dir, prefix) {

@@ -20,8 +20,18 @@ const mockUI = () => ({
   registerCtrlC: jest.fn(),
   setPrompt: jest.fn(),
   input: {
-    value: ''
-  }, // Add input for autocomplete tests
+    value: '',
+    focus: jest.fn(), // FIX: Add a mock focus function
+  },
+  output: { // FIX: Add a mock output object for commands like 'aafire'
+    innerHTML: '',
+    appendChild: jest.fn(),
+    scrollTop: 0,
+    scrollHeight: 0,
+  },
+  prompt: {
+      innerHTML: ''
+  }
 });
 
 // --- Mock localStorage ---
