@@ -11,7 +11,7 @@ import {
   EditorAddon,
   RpsAddon,
   TerminalUI
-} from '../src/terminal.js';
+} from '../src/index.js';
 
 // --- Mock UI ---
 const mockUI = () => ({
