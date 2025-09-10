@@ -21,11 +21,32 @@ function traverseDir(dirPath, rootDir) {
     if (entry.isDirectory()) {
       Object.assign(fileSystemObject, traverseDir(fullPath, rootDir));
     } else if (entry.isFile()) {
-      const content = fs.readFileSync(fullPath, 'utf8');
-      fileSystemObject[virtualPath] = {
-        type: 'file',
-        content: content,
-      };
+      // --- MODIFICATION START ---
+    
+      const extension = path.extname(entry.name).toLowerCase();
+      const isBinary = ['.jpg', '.jpeg', '.png', '.gif', '.mp3', '.mp4', '.webm'].includes(extension);
+    
+      let fileObject;
+    
+      if (isBinary) {
+        // For binary files, store a link, not the content.
+        // The URL path should be relative to where you'll serve static assets from.
+        fileObject = {
+          type: 'file',
+          ftype: 'link', // A new type to identify this as a link
+          content: path.join('/assets', path.relative(rootDir, fullPath)).replace(/\\/g, '/'), // This is now a URL/path
+        };
+      } else {
+        // For text files, keep the existing behavior.
+        const content = fs.readFileSync(fullPath, 'utf8');
+        fileObject = {
+          type: 'file',
+          content: content,
+        };
+      }
+      fileSystemObject[virtualPath] = fileObject;
+    
+      // --- MODIFICATION END ---
     }
   }
 

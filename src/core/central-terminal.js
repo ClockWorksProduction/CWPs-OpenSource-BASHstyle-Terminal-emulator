@@ -213,10 +213,57 @@ class CentralTerminal {
         if (!args[0]) this._print('usage: touch <file>');
         else this.vOS.writeFile(args[0], '', 'text', false);
       }));
-      this.addCommand(cmd('cat', 'print file contents', args => {
-        const content = this.vOS.readFile(args[0]);
-        this._print(content === null ? `cat: ${args[0]}: No such file` : content);
+      this.addCommand(cmd('cat', 'print file contents', (args, term) => {
+        const path = args[0];
+        if (!path) {
+          term._print('usage: cat <file>');
+          return;
+        }
+
+        const node = term.vOS.resolve(path);
+
+        if (!node) {
+          term._print(`cat: ${path}: No such file or directory`);
+          return;
+        }
+
+        if (node.kind === 'dir') {
+          term._print(`cat: ${path}: Is a directory`);
+          return;
+        }
+
+        // Handle linked files (images, audio, video)
+        if (node.ftype === 'link') {
+          const url = node.content;
+
+          if (url.match(/\.(jpeg|jpg|gif|png|svg)$/i)) {
+            const img = document.createElement('img');
+            img.src = url;
+            img.style.maxWidth = '80%';
+            img.style.display = 'block';
+            img.onload = () => { term.ui.output.scrollTop = term.ui.output.scrollHeight; };
+            term.ui.output.appendChild(img);
+          } else if (url.match(/\.(mp3|wav|ogg)$/i)) {
+            const audio = document.createElement('audio');
+            audio.src = url;
+            audio.controls = true;
+            audio.style.width = '80%';
+            term.ui.output.appendChild(audio);
+          } else if (url.match(/\.(mp4|webm)$/i)) {
+            const video = document.createElement('video');
+            video.src = url;
+            video.controls = true;
+            video.style.maxWidth = '80%';
+            term.ui.output.appendChild(video);
+          } else {
+            term._print(`Link to resource: ${url}`);
+          }
+        } else {
+          // Handle regular text files
+          term._print(node.content);
+        }
       }));
+
   
       this.addCommand(cmd('head', 'first N lines of a file', args => {
           const f = args[0]; const n = parseInt(args[1] || '10', 10);
