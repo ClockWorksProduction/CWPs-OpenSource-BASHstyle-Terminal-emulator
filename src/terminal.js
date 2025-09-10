@@ -31,7 +31,7 @@ class VOS {
   constructor() {
     this.root = new VDirectory('');
     this.homePath = '/home/user';
-    this.cwd = this._mkdirp(this.homePath);
+    this.cwd = this.root;
     this._seed();
   }
 
@@ -61,8 +61,8 @@ class VOS {
     };
     const vos = new VOS();
     vos.root = decode(json.root);
-    vos.cwd = vos.resolve(json.cwd) || vos._mkdirp('/home/user');
-    vos.homePath = json.homePath || '/home/user';
+    vos.cwd = vos.resolve(json.cwd) || vos._mkdirp('/');
+    vos.homePath = json.homePath || '/';
     return vos;
   }
 
@@ -644,7 +644,7 @@ class TerminalUI {
   }  
 
   setPrompt(promptText) { this.prompt.innerHTML = promptText; }
-  registerCtrlC(handler) { this._ctrlCHandler = handle; }
+  registerCtrlC(handler) { this._ctrlCHandler = handler; }
   }
 // ---------- Central Terminal ----------
 class CentralTerminal {
@@ -682,9 +682,9 @@ class CentralTerminal {
     if (this.addonExecutor.isActive()) {
       return `(${this.addonExecutor.activeAddon.name})> `;
     }
-    const cwd = this.vOS.pathOf(this.vOS.cwd);
+    const cwd = this.vOS.pathOf(this.vOS.cwd) || '/'; // <-- fallback to '/'
     return `<span class="prompt-user">user</span>@<span class="prompt-host">central</span> <span class="prompt-path">${cwd}</span>: $ `;
-  }
+  }  
 
   _saveHistory() { localStorage.setItem('cterm_history', JSON.stringify(this.commandHistory)); }
   _saveState() { localStorage.setItem('cterm_vos', JSON.stringify(this.vOS.toJSON())); }
@@ -695,44 +695,28 @@ class CentralTerminal {
 
   // --- Main Command Runner (REPLACE THIS METHOD) ---
   async runCommand(rawInput) {
-    const input = String(rawInput || '').trim();
+    if (!rawInput.trim()) return;
 
-    // This part now correctly handles addon input and exits early.
-    if (this.addonExecutor.handleCommand(input)) {
-        return;
-    }
-
-    // This handles empty commands sent to the main terminal.
-    if (!input) {
-        this.ui.setPrompt(this.prompt());
-        return;
-    }
-    
-    // Echo the command to the terminal UI.
-    this.ui.appendTerminalOutput(`${this.prompt()}${input}`);
-
-    // Save to history.
-    if (this.commandHistory[this.commandHistory.length - 1] !== input) {
-      this.commandHistory.push(input);
-      this._saveHistory();
-    }
-
-    // Parse the command and its arguments.
-    const parts = input.match(/[^\s"']+|"([^"]*)"|'([^']*)'/g) || [];
-    const name = (parts.shift() || '').replace(/['"]/g, '').toLowerCase();
-    const args = parts.map(a => a.replace(/['"]/g, ''));
-
+    // Split input respecting quotes
+    const parts = rawInput.match(/(?:[^\s"]+|"[^"]*")+/g).map(p => p.replace(/^"|"$/g, ''));
+    const name = parts.shift();
+    const args = parts;
     const cmd = this.commands[name];
+
     if (!cmd) {
       this._print(`bash: ${name}: command not found`);
       return;
     }
-    
-    // The 'await' here is the crucial fix for async commands.
-    await cmd.execute(args, this);
+
+    try {
+      // Support async commands too
+      await cmd.execute(args, this);
+    } catch (err) {
+      this._print(`Error running command: ${err}`);
+    }
+
     this._saveState();
   }
-
 
   // --- Boot Sequence ---
   async boot() {
@@ -794,14 +778,15 @@ class CentralTerminal {
         term.ui.setPrompt(term.prompt());
     }));
     this.addCommand(cmd('edit', 'edit a file using the text editor addon', (args, term) => {
-        term.runCommand(`run edit ${args.join(' ')}`);
+      term.addonExecutor.start('edit', args);
     }));
     this.addCommand(cmd('vim', 'alias for the edit command', (args, term) => {
-        term.runCommand(`run edit ${args.join(' ')}`);
+        term.addonExecutor.start('edit', args);
     }));
     this.addCommand(cmd('rps', 'play rock-paper-scissors', (args, term) => {
-        term.runCommand('run rps');
+      term.addonExecutor.start('rps', args);
     }));
+  
 
     // --- Filesystem (with fixes) ---
     this.addCommand(cmd('ls', 'list files', args => {
@@ -810,9 +795,17 @@ class CentralTerminal {
       else if (files.length > 0) this._print(files.join('  '));
       else this._print('');
     }));
-    this.addCommand(cmd('cd', 'change directory', args => {
-      if (!this.vOS.chdir(args[0] || this.vOS.homePath)) this._print(`cd: ${args[0]}: No such directory`);
-    }));
+    this.addCommand({
+      name: 'cd',
+      description: 'Change directory',
+      execute: (args, term) => {
+        const target = args[0] || '/';
+        // Simple validation; extend with VFS later
+        term.cwd = target.startsWith('/') ? target : `${term.cwd}/${target}`;
+        // normalize double slashes
+        term.cwd = term.cwd.replace(/\/+/g, '/');
+      }
+    });  
     this.addCommand(cmd('pwd', 'print working directory', () => this._print(this.vOS.pathOf(this.vOS.cwd))));
     
     // UPDATED MKDIR: Now supports -p flag for the 'tree' test
