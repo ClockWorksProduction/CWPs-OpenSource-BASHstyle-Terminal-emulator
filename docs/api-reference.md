@@ -84,30 +84,57 @@ Provides the API for interacting with the virtual file system. An instance is av
 
 ## Addon System
 
-Addons are self-contained modules that can be launched from the main terminal.
+Addons are self-contained modules that can be launched from the main terminal. When an addon is active, it takes over the input loop, allowing for a custom set of commands.
 
 ### `Addon` (Base Class)
 
-Create a new class that extends `Addon`.
+All addons must extend the `Addon` base class.
 
-#### `constructor(name)`
+#### `constructor(options)`
 
-*   `name` (String): The command used to launch your addon (e.g., `run my_addon`).
+The constructor accepts an `options` object with two key properties:
+
+*   `name` (String): The invocation name for the addon.
+*   `isTopLevel` (Boolean): If `true`, the addon is launched by its `name` directly (e.g., `edit`). If `false` (or omitted), it is launched as a subcommand of `run` (e.g., `run myaddon`).
 
 #### Lifecycle Methods
 
-*   `onStart(args)`: Called when the addon is started. `args` is an array of any arguments passed to the `run` command. Use this to set up your addon's initial state and UI.
-*   `onStop()`: Called when the addon is exited (e.g., via the `exit` command). Use this for cleanup.
+*   `onStart(args)`: Called when the addon is started. `args` is an array of any arguments passed to the invocation command.
+*   `onStop()`: Called when the addon is exited (typically via the `exit` command). Use this for cleanup.
 
 #### Input Handling
 
-*   `handleCommand(input)`: This method is called for every line of user input while the addon is active. You are responsible for parsing and handling the input.
+*   `handleCommand(input)`: This method is called for every line of user input while the addon is active.
 
 #### Addon-Specific Commands
 
-*   `addCommand(name, description, executeFn)`: Within your addon's constructor or `onStart` method, you can define a set of commands that are only available when your addon is running.
+*   `addCommand(name, description, executeFn)`: Defines a command that is only available when the addon is running.
 
 *   `exit()`: A built-in method that stops the addon and returns control to the main terminal.
+
+### Example: Registering Different Addon Types
+
+```javascript
+// 1. A standard addon launched with 'run notepad'
+class NotepadAddon extends Addon {
+    constructor() {
+        super({ name: 'notepad' }); // isTopLevel defaults to false
+    }
+    // ... implementation
+}
+
+// 2. A top-level addon launched with 'myeditor'
+class EditorAddon extends Addon {
+    constructor() {
+        super({ name: 'myeditor', isTopLevel: true });
+    }
+    // ... implementation
+}
+
+// Registering the addons
+term.registerAddon(new NotepadAddon());
+term.registerAddon(new EditorAddon());
+```
 
 ---
 
@@ -132,7 +159,7 @@ Accessed via `CentralTerminal.bootRegistry`.
 ### Example: Adding a Custom Boot Check
 
 ```javascript
-import { CentralTerminal, BootCheck } from './src/terminal.js';
+import { CentralTerminal, BootCheck } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
 
 const term = new CentralTerminal('#terminal-container');
 

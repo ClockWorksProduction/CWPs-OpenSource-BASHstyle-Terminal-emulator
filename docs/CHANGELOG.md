@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.5] - 2025-09-09
+
+### Added
+- **`hclear` command:** A new utility command to clear the entire command history from the terminal session and `localStorage`.
+
+### Fixed
+- **Addon Command Handling:** Corrected a critical regression in `runCommand` where it failed to delegate input to active addons (like `edit` or `rps`), rendering them unusable.
+- **`cd` Command:** Fixed a bug where the `cd` command was not correctly changing the directory within the Virtual File System (`vOS`). It now properly uses `vOS.chdir`.
+- **VFS Initialization:** Repaired a VFS boot sequence error where the `/home/user` directory was not being created, causing widespread command failures.
+- **Command History:** Fixed a bug where commands were not being pushed to the history stack, and ensured history is correctly saved and loaded.
+- **Boot Sequence:** Resolved an issue in the `BootCheckRegistry` that prevented saved sessions from `localStorage` from being loaded during tests.
+
+### Changed
+- **Test Suite:** Significantly improved the Jest test suite by mocking UI components more accurately and adding coverage for the new `hclear` command and history persistence.
+
 ## [5.1.4] - 2025-09-08
 
 ### Fixed

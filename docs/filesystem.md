@@ -30,69 +30,47 @@ The VFS supports a standard set of operations for managing files and directories
 
 ---
 
-## Programmatic API (`VOS`)
+## Programmatic Access
 
-When developing addons, you can directly interact with the VFS using the methods provided by the `VOS` (Virtual Operating System) class. An instance of this class is passed to your addon's `onStart` method.
+The VFS can also be controlled programmatically from within your addons. The `VOS` (Virtual Operating System) class provides a simple API for file and directory manipulation. An instance of this class is available in your addons via `this.vOS`.
 
 ### Key Methods
 
-| Method                  | Description                                            |
-| ----------------------- | ------------------------------------------------------ |
-| `createFile(path, content)` | Creates a new file with optional content.              |
-| `readFile(path)`        | Reads the content of a file. Returns a string.       |
-| `updateFile(path, content)` | Overwrites the content of an existing file.          |
-| `deleteFile(path)`      | Deletes a file.                                        |
-| `createDirectory(path)` | Creates a new directory.                               |
-| `listDirectory(path)`   | Returns an array of file and directory names.        |
-| `getFullPath(path)`     | Resolves a relative path to a full, absolute path.   |
-| `pathExists(path)`      | Checks if a file or directory exists at the given path.|
+The methods available on the `vOS` object directly mirror the core functionality documented in the **[API Reference](./api-reference.md#file--directory-operations)**.
+
+| Method                                       | Description                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------- |
+| `writeFile(path, content, ftype, overwrite)` | Creates or updates a file. `overwrite` defaults to `true`.                      |
+| `readFile(path)`                             | Reads the content of a file. Returns the content as a string or `null`.         |
+| `unlink(path)`                               | Deletes a file.                                                                 |
+| `mkdir(path)`                                | Creates a new directory.                                                        |
+| `rmdir(path)`                                | Removes an empty directory.                                                     |
+| `ls(path)`                                   | Returns an array of names for files and directories at a given path.            |
+| `chdir(path)`                                | Changes the current working directory.                                          |
+| `normalize(path)`                            | Resolves a path to its absolute form, handling `.` , `..`, and `~`.             |
+| `resolve(path)`                              | Resolves a path to its corresponding `VFile` or `VDirectory` object.            |
 
 ### Example Usage in an Addon
 
-The following example demonstrates how to use the `VOS` API to create, read, and manage files from within an addon.
+Here is a simple example of how to use the VFS API within an addon to create a file, read it, and then delete it.
 
 ```javascript
-import { Addon } from '/src/index.js';
+// Inside an Addon class method
 
-class FilesystemAddon extends Addon {
-    constructor() {
-        super('fs-demo');
-    }
+const filePath = this.vOS.normalize('~/my-new-file.txt');
+const fileContent = 'Hello, Virtual World!';
 
-    onStart(term, vOS) {
-        this.term.print("Demonstrating file system access...");
+// 1. Write the file
+this.vOS.writeFile(filePath, fileContent);
+this.term.writeln('File created.');
 
-        // The vOS instance is received here
-        this.vOS = vOS;
+// 2. Read the file
+const content = this.vOS.readFile(filePath);
+this.term.writeln(`File content: ${content}`);
 
-        // Get the full path to the user's home directory
-        const homeDir = this.vOS.getFullPath('~/_docs');
-        const filePath = `${homeDir}/demo-file.txt`;
-
-        // 1. Create a directory
-        if (!this.vOS.pathExists(homeDir)) {
-            this.vOS.createDirectory(homeDir);
-            this.term.print(`Created directory: ${homeDir}`)
-        }
-
-        // 2. Create a file
-        const content = "Hello from a CWP addon!";
-        if (this.vOS.createFile(filePath, content)) {
-            this.term.print(`Successfully created file: ${filePath}`);
-        } else {
-            this.term.print(`File already exists: ${filePath}`);
-        }
-
-        // 3. Read the file
-        const fileContent = this.vOS.readFile(filePath);
-        if (fileContent !== null) {
-            this.term.print(`Content of ${filePath}:`);
-            this.term.print(`> ${fileContent}`);
-        } else {
-            this.term.print(`Could not read file: ${filePath}`);
-        }
-
-        this.exit();
-    }
-}
+// 3. Delete the file
+this.vOS.unlink(filePath);
+this.term.writeln('File deleted.');
 ```
+
+This programmatic access is the foundation for building powerful addons like the `edit` text editor, which uses these methods to load, save, and manage files.

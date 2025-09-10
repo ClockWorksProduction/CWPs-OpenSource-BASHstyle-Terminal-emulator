@@ -30,7 +30,7 @@ Displays the contents of a file.
 Changes the current working directory.
 
 *   **Usage**: `cd [directory]`
-*   **Details**: Supports absolute paths (e.g., `/home/user`) and relative paths (e.g., `../` or `mydir`). Running `cd` without an argument will typically return you to the home directory (`/home/user`).
+*   **Details**: Supports absolute paths (e.g., `/home/user`) and relative paths (e.g., `../` or `mydir`). Running `cd` without an argument or with `~` will return you to the home directory (`/home/user`).
 *   **Examples**:
     ```bash
     # Navigate to a directory
@@ -38,6 +38,9 @@ Changes the current working directory.
 
     # Go up one level
     cd ..
+
+    # Go to home directory
+    cd
     ```
 
 ---
@@ -223,6 +226,15 @@ Displays the first few lines of a file.
 Lists all available commands.
 
 *   **Usage**: `help`
+
+---
+
+### `hclear`
+
+Clears the entire command history.
+
+*   **Usage**: `hclear`
+*   **Details**: Removes all commands from the current session's history and also deletes the history from persistent storage (`localStorage`).
 
 ---
 

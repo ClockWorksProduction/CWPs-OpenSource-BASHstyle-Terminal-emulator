@@ -2,16 +2,16 @@
 
 This project uses a four-tier automated release system powered by GitHub Actions. The version number in `package.json` on the `main` branch serves as the single source of truth for the upcoming Stable release.
 
-All pre-release channels (Dev, Bi-Weekly, LTS) are derived from this base version at build time and do not create commits in the repository.
+All pre-release channels (Dev, Nightly, LTS) are derived from this base version at build time and do not create commits in the repository.
 
 ## Release Channels
 
 | Channel | npm Tag | Source Branch | Trigger | Version Format | Current Version |
 |---|---|---|---|---|---|
 | **Dev** | `@dev` | `main` | Every push | `{base-version}-dev.{git-sha}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/dev.svg) |
-| **Bi-Weekly** | `@nightly`| `main` | Bi-weekly | `{base-version}-bwk.{yyyymmdd}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg) |
+| **Nightly** | `@nightly`| `main` | Scheduled | `{base-version}-nightly.{yyyymmdd}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/nightly.svg) |
 | **Stable** | `@latest` | `main` | Manual | `{base-version}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/latest.svg) |
-| **LTS** | `@lts` | `release/vX`| Manual | `{base-version}-lts.{yyyymm}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
+| **LTS** | `@lts` | `main`| Manual | `{base-version}-lts.{yyyymm}` | ![npm version](https://img.shields.io/npm/v/@clockworksproduction-studio/cwp-open-terminal-emulator/lts.svg) |
 
 ---
 
@@ -34,5 +34,5 @@ All pre-release channels (Dev, Bi-Weekly, LTS) are derived from this base versio
 
 ### 4. Long-Term Support (`@lts`)
 - **Workflow File:** `.github/workflows/lts-release.yml`
-- **Trigger:** Manually from the GitHub Actions tab, targeting a specific `release/vX` branch.
+- **Trigger:** Manually from the GitHub Actions tab on the `main` branch.
 - **Action:** Appends the `-lts.{yyyymm}` suffix to the base version at build time and publishes to npm as a pre-release.

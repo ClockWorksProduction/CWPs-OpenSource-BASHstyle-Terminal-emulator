@@ -21,6 +21,7 @@ This documentation will guide you through the installation, configuration, and u
 ## Table of Contents
 
 *   [Setup Guide](./SETUP.md)
+*   [Manual Setup Guide](./manual-setup-guide.md)
 *   [API Reference](./api-reference.md)
 *   [Default Commands](./commands.md)
 *   [Addon System](./addons.md)

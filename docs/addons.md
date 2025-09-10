@@ -30,9 +30,9 @@ First, define a new class that extends `Addon`.
 // Extend the base Addon class
 class NotepadAddon extends Addon {
     constructor() {
-        // 1. Call super() with the addon's invocation name.
-        // This is the name used in `run notepad`.
-        super('notepad');
+        // 1. Call super() with an options object for the addon's configuration.
+        // The `name` is used to invoke the addon (e.g., `run notepad`).
+        super({ name: 'notepad' }); // `isTopLevel` defaults to false
 
         // 2. Initialize the addon's internal state.
         this.notes = {}; // A simple object to hold our notes by title.
@@ -161,7 +161,7 @@ Finally, instantiate your addon and register it with the main `CentralTerminal` 
 
 ```javascript
 // In your main application file (e.g., index.js)
-import { CentralTerminal, Addon } from './src/terminal.js';
+import { CentralTerminal, Addon } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
 
 // ... (paste the NotepadAddon class here)
 
@@ -171,7 +171,7 @@ const term = new CentralTerminal('#terminal-container');
 term.registerAddon(new NotepadAddon());
 
 // Boot the terminal
-term.boot();
+await term.boot();
 ```
 
 ### Final Usage
