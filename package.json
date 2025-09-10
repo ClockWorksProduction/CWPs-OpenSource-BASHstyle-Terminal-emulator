@@ -7,14 +7,17 @@
   "module": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./addons/*": "./addons/*.js"
+    "./core/*": "./src/core/*.js",
+    "./boot/*": "./src/boot/*.js",
+    "./vfs/*": "./src/vfs/*.js",
+    "./addons/*": "./src/addons/*.js"
   },
   "bin": {
-    "cwp-terminal-setup": "bin/cwp-terminal-setup.cjs"
+    "cwp-terminal-setup": "bin/cwp-terminal-setup.cjs",
+    "cwp-vfs-importer": "bin/vfs-importer.cjs"
   },
   "files": [
     "src",
-    "addons",
     "bin",
     "docs",
     "LICENSE",

@@ -1,4 +1,4 @@
-import { CentralTerminal, EditorAddon, RpsAddon, BootCheck } from '../src/terminal.js';
+import { nowISO, deepClone, CentralTerminal, TerminalUI, BootCheck, BootCheckRegistry, BootHandler, VOS, VFile, VDirectory, Addon, AddonExecutor, EditorAddon, RpsAddon } from '../src/index.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // --- Terminal Setup ---

@@ -6,17 +6,18 @@ This document provides a detailed reference for the core API of the CWP Open Ter
 
 ## Core Architecture
 
-The terminal is composed of several key classes that work together:
+The terminal is composed of several key modules that work together:
 
-1.  **`CentralTerminal`**: The primary, top-level class that orchestrates all operations. It manages commands, addons, and the user session.
-2.  **`TerminalUI`**: A handler that manages all DOM interactions, including input, output, and rendering. It can be automatically generated or mapped to your existing HTML structure.
-3.  **`VOS` (Virtual Operating System)**: An in-memory virtual file system that simulates a POSIX-like environment with files and directories.
-4.  **`AddonExecutor`**: A manager responsible for the lifecycle of addons.
-5.  **`BootCheckRegistry`**: A system that runs diagnostic and setup tasks before the terminal is ready for user input.
+1.  **`core`**: Contains the primary, top-level classes that orchestrate all operations. `CentralTerminal` is the main entry point, `TerminalUI` manages the DOM, and `terminal.js` provides core utilities.
+2.  **`boot`**: Manages the boot sequence. `BootHandler` runs all the checks, `BootCheck` represents a single check, and `BootCheckRegistry` is where you can add your own custom checks.
+3.  **`vfs`**: The Virtual File System. `VOS` provides the main API, while `VFile` and `VDirectory` represent files and directories.
+4.  **`addons`**: The addon system. `Addon` is the base class for creating new addons, and `AddonExecutor` manages their lifecycle.
 
 ---
 
 ## `CentralTerminal`
+
+**Source:** `src/core/central-terminal.js`
 
 The main class that you will instantiate. It binds everything together.
 
@@ -45,6 +46,8 @@ Creates a new terminal instance. The constructor is flexible:
 
 ## `TerminalUI`
 
+**Source:** `src/core/terminal-ui.js`
+
 Handles all interaction with the DOM. You can let `CentralTerminal` create it for you or instantiate it yourself for more complex integrations.
 
 ### `constructor(containerSelector, onCommand, onAutocomplete, options)`
@@ -60,6 +63,8 @@ Handles all interaction with the DOM. You can let `CentralTerminal` create it fo
 ---
 
 ## `VOS` (Virtual Operating System)
+
+**Source:** `src/vfs/vos.js`
 
 Provides the API for interacting with the virtual file system. An instance is available at `CentralTerminal.vOS`.
 
@@ -88,6 +93,8 @@ Addons are self-contained modules that can be launched from the main terminal. W
 
 ### `Addon` (Base Class)
 
+**Source:** `src/addons/addon.js`
+
 All addons must extend the `Addon` base class.
 
 #### `constructor(options)`
@@ -115,6 +122,9 @@ The constructor accepts an `options` object with two key properties:
 ### Example: Registering Different Addon Types
 
 ```javascript
+import { CentralTerminal } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/core/central-terminal.js''';
+import { Addon } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/addons/addon.js''';
+
 // 1. A standard addon launched with 'run notepad'
 class NotepadAddon extends Addon {
     constructor() {
@@ -132,6 +142,7 @@ class EditorAddon extends Addon {
 }
 
 // Registering the addons
+const term = new CentralTerminal('#terminal-container');
 term.registerAddon(new NotepadAddon());
 term.registerAddon(new EditorAddon());
 ```
@@ -144,6 +155,8 @@ The boot sequence runs diagnostics before the terminal starts. You can add your 
 
 ### `BootCheck`
 
+**Source:** `src/boot/boot-check.js`
+
 This class represents a single check.
 
 *   `constructor(name, fn, description)`:
@@ -152,6 +165,8 @@ This class represents a single check.
 
 ### `BootCheckRegistry`
 
+**Source:** `src/boot/boot-check-registry.js`
+
 Accessed via `CentralTerminal.bootRegistry`.
 
 *   `add(check)`: Use this method to add a new `BootCheck` instance to the boot sequence.
@@ -159,7 +174,8 @@ Accessed via `CentralTerminal.bootRegistry`.
 ### Example: Adding a Custom Boot Check
 
 ```javascript
-import { CentralTerminal, BootCheck } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
+import { CentralTerminal } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/core/central-terminal.js''';
+import { BootCheck } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/boot/boot-check.js''';
 
 const term = new CentralTerminal('#terminal-container');
 

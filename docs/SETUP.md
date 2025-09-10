@@ -34,6 +34,14 @@ This guide contains everything you need to get started, including the HTML, CSS,
 
 ---
 
+## Advanced Setup: Modular Configuration
+
+For developers who want to separate their configuration into individual files (e.g., for BIOS text, the file system, or welcome messages), we provide a guide on how to load these components dynamically.
+
+- **[Advanced Setup: Modular Configuration](./advanced-setup.md)**
+
+---
+
 ## Next Steps
 
 Once your terminal is running, what's next?

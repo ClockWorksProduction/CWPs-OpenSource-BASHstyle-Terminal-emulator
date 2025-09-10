@@ -24,9 +24,12 @@ Let's build a practical addon: a simple `notepad` for creating and viewing short
 
 ### Step 1: Create the Addon Class
 
-First, define a new class that extends `Addon`.
+First, define a new class that extends `Addon`, which you will import from the package.
 
 ```javascript
+// In a new file, e.g., NotepadAddon.js
+import { Addon } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/addons/addon.js''';
+
 // Extend the base Addon class
 class NotepadAddon extends Addon {
     constructor() {
@@ -157,13 +160,12 @@ load() {
 
 ### Step 5: Register the Addon
 
-Finally, instantiate your addon and register it with the main `CentralTerminal` instance before booting.
+Finally, import your new addon and register it with the main `CentralTerminal` instance before booting.
 
 ```javascript
-// In your main application file (e.g., index.js)
-import { CentralTerminal, Addon } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
-
-// ... (paste the NotepadAddon class here)
+// In your main application file (e.g., app.js)
+import { CentralTerminal } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/core/central-terminal.js''';
+import { NotepadAddon } from '''./NotepadAddon.js'''; // Import your custom addon
 
 const term = new CentralTerminal('#terminal-container');
 

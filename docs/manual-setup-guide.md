@@ -78,7 +78,7 @@ h1 {
 
 ## Step 3: The JavaScript File (`app.js`)
 
-This is where the terminal is initialized. You need to import the `CentralTerminal` class from the npm package and any addons you wish to use. The code should run after the HTML document is fully loaded, which is why we use the `DOMContentLoaded` event listener.
+This is where the terminal is initialized. You need to import the necessary classes from the npm package and any addons you wish to use. The code should run after the HTML document is fully loaded, which is why we use the `DOMContentLoaded` event listener.
 
 **Prerequisite:** Make sure you have installed the package in your project:
 ```bash
@@ -88,7 +88,9 @@ npm install @clockworksproduction-studio/cwp-open-terminal-emulator
 **Template: `app.js`**
 ```javascript
 // Import the main Terminal class and any addons you want to use
-import { CentralTerminal, EditorAddon, RpsAddon } from '@clockworksproduction-studio/cwp-open-terminal-emulator';
+import { CentralTerminal } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/core/central-terminal.js''';
+import { EditorAddon } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/addons/editor-addon.js''';
+import { RpsAddon } from '''@clockworksproduction-studio/cwp-open-terminal-emulator/addons/rps-addon.js''';
 
 /**
  * The main entry point for the application.
